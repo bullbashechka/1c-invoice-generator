@@ -1,0 +1,1 @@
+# 1c-invoice-generator
