@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Form xmlns="http://v8.1c.ru/8.3/xcf/logform" xmlns:app="http://v8.1c.ru/8.2/managed-application/core" xmlns:cfg="http://v8.1c.ru/8.1/data/enterprise/current-config" xmlns:dcscor="http://v8.1c.ru/8.1/data-composition-system/core" xmlns:dcsset="http://v8.1c.ru/8.1/data-composition-system/settings" xmlns:ent="http://v8.1c.ru/8.1/data/enterprise" xmlns:lf="http://v8.1c.ru/8.2/managed-application/logform" xmlns:style="http://v8.1c.ru/8.1/data/ui/style" xmlns:sys="http://v8.1c.ru/8.1/data/ui/fonts/system" xmlns:v8="http://v8.1c.ru/8.1/data/core" xmlns:v8ui="http://v8.1c.ru/8.1/data/ui" xmlns:web="http://v8.1c.ru/8.1/data/ui/colors/web" xmlns:win="http://v8.1c.ru/8.1/data/ui/colors/windows" xmlns:xr="http://v8.1c.ru/8.3/xcf/readable" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="2.20">
+
+	<AutoCommandBar name="ФормаКоманднаяПанель" id="-1">
+		<Autofill>false</Autofill>
+	</AutoCommandBar>
+	<Events>
+		<Event name="OnCreateAtServer">ПриСозданииНаСервере</Event>
+	</Events>
+	<ChildItems>
+		<UsualGroup name="ГруппаЗапрос" id="25">
+			<HorizontalStretch>true</HorizontalStretch>
+			<Group>Vertical</Group>
+			<Representation>NormalSeparation</Representation>
+			<Behavior>Collapsible</Behavior>
+			<Collapsed>true</Collapsed>
+			<ControlRepresentation>Picture</ControlRepresentation>
+			<Title>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Запрос</v8:content>
+				</v8:item>
+			</Title>
+			<ExtendedTooltip name="ГруппаЗапросРасширеннаяПодсказка" id="26"/>
+			<ChildItems>
+				<InputField name="ПолеТекстЗапроса" id="27">
+					<DataPath>ТекстЗапроса</DataPath>
+					<TitleLocation>None</TitleLocation>
+					<HorizontalStretch>true</HorizontalStretch>
+					<AutoMaxWidth>false</AutoMaxWidth>
+					<MultiLine>true</MultiLine>
+					<ReadOnly>true</ReadOnly>
+					<Height>8</Height>
+					<ExtendedTooltip name="ПолеТекстЗапросаРасширеннаяПодсказка" id="28"/>
+				</InputField>
+			</ChildItems>
+		</UsualGroup>
+		<UsualGroup name="ГруппаПанели" id="1">
+			<HorizontalStretch>true</HorizontalStretch>
+			<VerticalStretch>true</VerticalStretch>
+			<Group>AlwaysHorizontal</Group>
+			<Representation>None</Representation>
+			<ShowTitle>false</ShowTitle>
+			<ExtendedTooltip name="ГруппаПанелиРасширеннаяПодсказка" id="2"/>
+			<ChildItems>
+				<UsualGroup name="ГруппаОригинал" id="3">
+					<HorizontalStretch>true</HorizontalStretch>
+					<VerticalStretch>true</VerticalStretch>
+					<Group>Vertical</Group>
+					<Representation>None</Representation>
+					<ShowTitle>false</ShowTitle>
+					<ExtendedTooltip name="ГруппаОригиналРасширеннаяПодсказка" id="4"/>
+					<ChildItems>
+						<LabelDecoration name="НадписьОригинал" id="5">
+							<TextColor>web:DarkOrange</TextColor>
+							<Font ref="style:TextFont" height="10" bold="true" italic="false" underline="false" strikeout="false" kind="StyleItem"/>
+							<Title formatted="false">
+								<v8:item>
+									<v8:lang>ru</v8:lang>
+									<v8:content>Исходные данные</v8:content>
+								</v8:item>
+							</Title>
+							<ContextMenu name="НадписьОригиналКонтекстноеМеню" id="21"/>
+							<ExtendedTooltip name="НадписьОригиналРасширеннаяПодсказка" id="6"/>
+						</LabelDecoration>
+						<HTMLDocumentField name="ПолеОригинал" id="7">
+							<DataPath>HTMLОригинал</DataPath>
+							<TitleLocation>None</TitleLocation>
+							<HorizontalStretch>true</HorizontalStretch>
+							<VerticalStretch>true</VerticalStretch>
+							<Height>15</Height>
+							<ContextMenu name="ПолеОригиналКонтекстноеМеню" id="22"/>
+							<ExtendedTooltip name="ПолеОригиналРасширеннаяПодсказка" id="8"/>
+						</HTMLDocumentField>
+					</ChildItems>
+				</UsualGroup>
+				<UsualGroup name="ГруппаАнонимизированный" id="9">
+					<HorizontalStretch>true</HorizontalStretch>
+					<VerticalStretch>true</VerticalStretch>
+					<Group>Vertical</Group>
+					<Representation>None</Representation>
+					<ShowTitle>false</ShowTitle>
+					<ExtendedTooltip name="ГруппаАнонимизированныйРасширеннаяПодсказка" id="10"/>
+					<ChildItems>
+						<LabelDecoration name="НадписьАнонимизированный" id="11">
+							<TextColor>web:ForestGreen</TextColor>
+							<Font ref="style:TextFont" height="10" bold="true" italic="false" underline="false" strikeout="false" kind="StyleItem"/>
+							<Title formatted="false">
+								<v8:item>
+									<v8:lang>ru</v8:lang>
+									<v8:content>Анонимизированные данные</v8:content>
+								</v8:item>
+							</Title>
+							<ContextMenu name="НадписьАнонимизированныйКонтекстноеМеню" id="23"/>
+							<ExtendedTooltip name="НадписьАнонимизированныйРасширеннаяПодсказка" id="12"/>
+						</LabelDecoration>
+						<HTMLDocumentField name="ПолеАнонимизированный" id="13">
+							<DataPath>HTMLАнонимизированный</DataPath>
+							<TitleLocation>None</TitleLocation>
+							<HorizontalStretch>true</HorizontalStretch>
+							<VerticalStretch>true</VerticalStretch>
+							<Height>15</Height>
+							<ContextMenu name="ПолеАнонимизированныйКонтекстноеМеню" id="24"/>
+							<ExtendedTooltip name="ПолеАнонимизированныйРасширеннаяПодсказка" id="14"/>
+						</HTMLDocumentField>
+					</ChildItems>
+				</UsualGroup>
+			</ChildItems>
+		</UsualGroup>
+		<UsualGroup name="ГруппаКнопки" id="15">
+			<Group>AlwaysHorizontal</Group>
+			<Representation>None</Representation>
+			<ExtendedTooltip name="ГруппаКнопкиРасширеннаяПодсказка" id="16"/>
+			<ChildItems>
+				<Button name="КнопкаРазрешить" id="17">
+					<Type>UsualButton</Type>
+					<CommandName>Form.Command.Разрешить</CommandName>
+					<TextColor>web:Green</TextColor>
+					<ExtendedTooltip name="КнопкаРазрешитьРасширеннаяПодсказка" id="18"/>
+				</Button>
+				<Button name="КнопкаОтклонить" id="19">
+					<Type>UsualButton</Type>
+					<CommandName>Form.Command.Отклонить</CommandName>
+					<TextColor>web:Red</TextColor>
+					<ExtendedTooltip name="КнопкаОтклонитьРасширеннаяПодсказка" id="20"/>
+				</Button>
+			</ChildItems>
+		</UsualGroup>
+	</ChildItems>
+	<Attributes>
+		<Attribute name="HTMLОригинал" id="1">
+			<Type>
+				<v8:Type>xs:string</v8:Type>
+				<v8:StringQualifiers>
+					<v8:Length>0</v8:Length>
+					<v8:AllowedLength>Variable</v8:AllowedLength>
+				</v8:StringQualifiers>
+			</Type>
+		</Attribute>
+		<Attribute name="ТекстЗапроса" id="3">
+			<Type>
+				<v8:Type>xs:string</v8:Type>
+				<v8:StringQualifiers>
+					<v8:Length>0</v8:Length>
+					<v8:AllowedLength>Variable</v8:AllowedLength>
+				</v8:StringQualifiers>
+			</Type>
+		</Attribute>
+		<Attribute name="HTMLАнонимизированный" id="2">
+			<Type>
+				<v8:Type>xs:string</v8:Type>
+				<v8:StringQualifiers>
+					<v8:Length>0</v8:Length>
+					<v8:AllowedLength>Variable</v8:AllowedLength>
+				</v8:StringQualifiers>
+			</Type>
+		</Attribute>
+	</Attributes>
+	<Commands>
+		<Command name="Разрешить" id="1">
+			<Title>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Разрешить</v8:content>
+				</v8:item>
+			</Title>
+			<Action>Разрешить</Action>
+		</Command>
+		<Command name="Отклонить" id="2">
+			<Action>Отклонить</Action>
+		</Command>
+	</Commands>
+</Form>

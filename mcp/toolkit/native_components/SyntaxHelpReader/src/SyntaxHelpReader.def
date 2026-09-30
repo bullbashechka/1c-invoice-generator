@@ -1,0 +1,6 @@
+LIBRARY SyntaxHelpReader
+EXPORTS
+    GetClassNames
+    GetClassObject
+    DestroyObject
+    SetPlatformCapabilities

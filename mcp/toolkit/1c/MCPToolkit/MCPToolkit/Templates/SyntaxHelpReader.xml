@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<MetaDataObject xmlns="http://v8.1c.ru/8.3/MDClasses" xmlns:v8="http://v8.1c.ru/8.1/data/core" xmlns:xr="http://v8.1c.ru/8.3/xcf/readable" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="2.20">
+	<Template uuid="a2f7c3d1-5b8e-4f2a-c6d9-3e1a2b4c7f8e">
+		<Properties>
+			<Name>SyntaxHelpReader</Name>
+			<Synonym>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Syntax Help Reader (Native)</v8:content>
+				</v8:item>
+			</Synonym>
+			<Comment>Native API компонента чтения справки BSL из .hbk файлов</Comment>
+			<TemplateType>BinaryData</TemplateType>
+		</Properties>
+	</Template>
+</MetaDataObject>

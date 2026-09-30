@@ -1,0 +1,6 @@
+LIBRARY ScreenCapture
+EXPORTS
+    GetClassNames
+    GetClassObject
+    DestroyObject
+    SetPlatformCapabilities
