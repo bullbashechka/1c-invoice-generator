@@ -1,0 +1,29 @@
+﻿<?xml version='1.0' encoding='utf-8'?>
+<ns0:MetaDataObject xmlns:app="http://v8.1c.ru/8.2/managed-application/core" xmlns:ns0="http://v8.1c.ru/8.3/MDClasses" xmlns:ns1="http://v8.1c.ru/8.3/xcf/readable" xmlns:ns2="http://v8.1c.ru/8.1/data/core" version="2.16">
+	<ns0:ExternalDataProcessor uuid="b0443e5d-92bb-4d3f-9773-0b3639065289">
+		<ns0:InternalInfo>
+			<ns1:ContainedObject>
+				<ns1:ClassId>c3831ec8-d8d5-4f93-8a22-f9bfae07327f</ns1:ClassId>
+				<ns1:ObjectId>be7e3018-8eae-4734-9428-5c75abd37380</ns1:ObjectId>
+			</ns1:ContainedObject>
+			<ns1:GeneratedType name="ExternalDataProcessorObject.Открытие_b24" category="Object">
+				<ns1:TypeId>11debaab-b971-4958-b04b-ba4c3d27aec9</ns1:TypeId>
+				<ns1:ValueId>338457cb-28f5-48fd-88ef-d4569149ce13</ns1:ValueId>
+			</ns1:GeneratedType>
+		</ns0:InternalInfo>
+		<ns0:Properties>
+			<ns0:Name>Открытие_b24</ns0:Name>
+			<ns0:Synonym>
+				<ns2:item>
+					<ns2:lang>ru</ns2:lang>
+					<ns2:content>Открытие формы задачи Б24</ns2:content>
+				</ns2:item>
+			</ns0:Synonym>
+			<ns0:Comment>Открывает форму новой задачи Б24 после успешного проведения и закрытия заказа клиента в текущем сеансе КА Казахстан 2.4.5.18.</ns0:Comment>
+			<ns0:DefaultForm>ExternalDataProcessor.Открытие_b24.Form.Форма</ns0:DefaultForm>
+			<ns0:AuxiliaryForm />
+		</ns0:Properties>
+		<ns0:ChildObjects>
+			<ns0:Form>Форма</ns0:Form></ns0:ChildObjects>
+	</ns0:ExternalDataProcessor>
+</ns0:MetaDataObject>

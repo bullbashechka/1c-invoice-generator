@@ -1,0 +1,21 @@
+﻿<?xml version='1.0' encoding='utf-8'?>
+<ns0:MetaDataObject xmlns:app="http://v8.1c.ru/8.2/managed-application/core" xmlns:ns0="http://v8.1c.ru/8.3/MDClasses" xmlns:ns1="http://v8.1c.ru/8.1/data/core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="2.16">
+	<ns0:Form uuid="83112a99-68fa-4f07-a0e4-4bd82bcee317">
+		<ns0:Properties>
+			<ns0:Name>Форма</ns0:Name>
+			<ns0:Synonym>
+				<ns1:item>
+					<ns1:lang>ru</ns1:lang>
+					<ns1:content>Открытие формы задачи Б24</ns1:content>
+				</ns1:item>
+			</ns0:Synonym>
+			<ns0:Comment />
+			<ns0:FormType>Managed</ns0:FormType>
+			<ns0:IncludeHelpInContents>false</ns0:IncludeHelpInContents>
+			<ns0:UsePurposes>
+				<ns1:Value xsi:type="app:ApplicationUsePurpose">PlatformApplication</ns1:Value>
+			</ns0:UsePurposes>
+			<ns0:ExtendedPresentation />
+		</ns0:Properties>
+	</ns0:Form>
+</ns0:MetaDataObject>
