@@ -1,0 +1,47 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<ConfigDumpInfo xmlns="http://v8.1c.ru/8.3/xcf/dumpinfo" xmlns:xen="http://v8.1c.ru/8.3/xcf/enums" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" format="Hierarchical" version="2.16">
+	<ConfigVersions>
+		<Metadata name="CommonPicture.ЗаполнитьПоШаблону" id="1cf164ca-9df1-442c-81e9-d225f2e243bc" configVersion="d39223167d714441f2688e8b5e7dcfabdb33690b"/>
+		<Metadata name="CommonPicture.ЗаполнитьФорму" id="9b8f38b7-45a1-44ff-9173-718fb7ab1461" configVersion="5001d9734f05effd24f686bfb0fd89a07bea7716"/>
+		<Metadata name="CommonPicture.Набор" id="04f2288f-eab7-4d2b-becc-6729479c9543" configVersion="bdef1812a5317eb3cd4ea94caf860cc6f66e7110"/>
+		<Metadata name="CommonPicture.Наборы" id="9a0e7e76-0073-43be-8d73-87876d10e539" configVersion="5e01006edb48d78941c08733442fbdc82531d86b"/>
+		<Metadata name="CommonPicture.Отчеты" id="38bc0a33-35fd-43af-b3b1-09957d8c32e1" configVersion="c72c4627d786e5f3abfb92e3bcf0d5e130e5f8e7"/>
+		<Metadata name="Configuration.Б24ПрототипЭтап1" id="827f97e0-90bc-4a06-9752-2d3712251f29" configVersion="f454b76ba829872b38babd2121100288f7665b5d"/>
+		<Metadata name="Document.ЗаказКлиента" id="6a7dec99-fbec-457b-ba99-764defab6b04" configVersion="5439df8ac930f3b61eaaa5f257fbb38e7cbd4276"/>
+		<Metadata name="Document.ЗаказКлиента.Form.ФормаДокумента" id="7403c468-55a5-4381-ab35-0c74fe3113f3" configVersion="75bbc524d7c7675ed80eef268e9a47bfbcc37bec"/>
+		<Metadata name="Document.ЗаказКлиента.Form.ФормаДокумента.Form" id="7403c468-55a5-4381-ab35-0c74fe3113f3.0" configVersion="b09bfa8499168e889cddcb8ff677be43ba92f284"/>
+		<Metadata name="Document.ЗаказКлиента.Form.ФормаСписка" id="2ad4bb62-72c4-4ea4-9d0d-a9f199e87526" configVersion="9b4c0a2356ce62e4aac1b7080913795a21a936d2"/>
+		<Metadata name="Document.ЗаказКлиента.Form.ФормаСписка.Form" id="2ad4bb62-72c4-4ea4-9d0d-a9f199e87526.0" configVersion="246c898fa9654415a7da7a807c2da3fdac357c5d"/>
+		<Metadata name="Enum.СпособыДоставки" id="4c005a39-57c8-441c-ad14-96c4b60c2114" configVersion="9052a62c66ede5fb444c8e432978c19a39a8eecc">
+			<Metadata name="Enum.СпособыДоставки.EnumValue.СиламиПеревозчика" id="25e6d9cf-abe9-4444-a68e-a297cfe064b2"/>
+			<Metadata name="Enum.СпособыДоставки.EnumValue.КПолучателюОпределяетСлужбаДоставки" id="326b1fbb-045c-4c0e-9aef-7e7b808f03f1"/>
+			<Metadata name="Enum.СпособыДоставки.EnumValue.Самовывоз" id="64f51c71-d140-4b4d-9dfa-c55b457f8db5"/>
+			<Metadata name="Enum.СпособыДоставки.EnumValue.СиламиПеревозчикаПоАдресу" id="6ad70db8-3f8f-47fd-9797-5394b289b37f"/>
+			<Metadata name="Enum.СпособыДоставки.EnumValue.ДоКлиента" id="fbd4df3d-1f81-46c8-99ba-46151e3daa8c"/>
+		</Metadata>
+		<Metadata name="Enum.СтатусыДействияВидовЦен" id="a24a4002-c581-46ab-8ab5-636320ef1b71" configVersion="46fda1d2a8d019f145d85a05c1aeb84f71ad4ace">
+			<Metadata name="Enum.СтатусыДействияВидовЦен.EnumValue.Действует" id="eb6ba483-9379-4aee-932a-93e1def6fa4c"/>
+		</Metadata>
+		<Metadata name="Enum.ТипыНалогообложенияНДС" id="a9ef5323-9281-46f6-8aee-3f3091d8d396" configVersion="523b142e32c6d38dc413d2611f0d490e6f35067d">
+			<Metadata name="Enum.ТипыНалогообложенияНДС.EnumValue.ПродажаОблагаетсяЕНВД" id="05ed3dfc-b1e0-4005-b242-883d2f3efb35"/>
+			<Metadata name="Enum.ТипыНалогообложенияНДС.EnumValue.ПродажаНеОблагаетсяНДС" id="5ab2845c-18d0-40dd-96c2-d6b01b051d55"/>
+			<Metadata name="Enum.ТипыНалогообложенияНДС.EnumValue.ПродажаОблагаетсяНДС" id="e197b832-b928-415c-b3f6-cbf93d9a32b2"/>
+			<Metadata name="Enum.ТипыНалогообложенияНДС.EnumValue.ПродажаНаЭкспорт" id="fe5d2b2e-1a20-42e8-9676-dd94d06fae69"/>
+		</Metadata>
+		<Metadata name="Enum.ХозяйственныеОперации" id="9225511c-2c1d-42fc-8960-7225c42961de" configVersion="9b62fb59220b3853348b06048d795ab1a810c3b1">
+			<Metadata name="Enum.ХозяйственныеОперации.EnumValue.РеализацияКлиенту" id="14556f12-a99f-441f-bad7-a1f147da55cc"/>
+			<Metadata name="Enum.ХозяйственныеОперации.EnumValue.РеализацияБезПереходаПраваСобственности" id="72adb4d6-5f19-425b-b80b-673e10edf4be"/>
+			<Metadata name="Enum.ХозяйственныеОперации.EnumValue.ПередачаНаКомиссию" id="bd70b0bb-df33-434a-a7cf-6589f9a7a670"/>
+		</Metadata>
+		<Metadata name="InformationRegister.Расш1_СвязиЗаказовБ24" id="3f3cb572-a014-471c-a91a-25d84dbad2f2" configVersion="17eb0f40a6b752e8bb23b9c3a9a0c25725fec65f">
+			<Metadata name="InformationRegister.Расш1_СвязиЗаказовБ24.Dimension.Заказ" id="025a9e3c-5448-4930-9dd2-b86d5be583f9"/>
+			<Metadata name="InformationRegister.Расш1_СвязиЗаказовБ24.Resource.ОперацияId" id="11d365cf-e49c-432f-981a-b8b3d9bad0db"/>
+			<Metadata name="InformationRegister.Расш1_СвязиЗаказовБ24.Resource.ЗадачаId" id="961ceba5-65b5-4aa0-8d18-e528d18ff0a6"/>
+		</Metadata>
+		<Metadata name="InformationRegister.Расш1_СвязиЗаказовБ24.RecordSetModule" id="3f3cb572-a014-471c-a91a-25d84dbad2f2.1" configVersion="358e2503efefb93d54186e16d12b79e4c6dcf66b"/>
+		<Metadata name="Language.Русский" id="ac19c678-c0fa-4814-837e-d9ce207ea1a7" configVersion="412802e37a7d1bf4f54b6b874b22007c0f3bcbb9"/>
+		<Metadata name="Role.Расш1_ОсновнаяРоль" id="2e291c44-afb2-4153-89d1-81e86f2ae59e" configVersion="bf5af5cedc4617778d8634cc0d0363c30a4fda7b"/>
+		<Metadata name="StyleItem.ИтогиФон" id="586a3dbe-2893-4a61-910e-a365b4dfc6f2" configVersion="7551c7c49ea7271d9702ab8ee51ad2271be02475"/>
+		<Metadata name="StyleItem.ЦветФонаВыделения" id="02076116-7625-4b3a-ac0b-59cddb3a742d" configVersion="16a060b10ab475264eece33fbb18198419362682"/>
+	</ConfigVersions>
+</ConfigDumpInfo>
