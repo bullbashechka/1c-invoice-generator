@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>КА — проверка интерфейса Б24</title>
+    <script src="https://api.bitrix24.tech/api/v1/"></script>
+    <script src="probe.js"></script>
+    <script src="bind.js"></script>
+    <script src="navigation.js"></script>
+    <style>
+        body { margin: 24px; font: 16px/1.5 system-ui, sans-serif; color: #202830; }
+        h1 { font-size: 24px; }
+        pre { padding: 16px; background: #f3f5f7; white-space: pre-wrap; overflow-wrap: anywhere; }
+    </style>
+</head>
+<body>
+    <h1>Проверка интерфейса Б24</h1>
+    <p>Чтение прав, точек встраивания и команд текущей точки. Задачи не создаются и не изменяются.</p>
+    <p id="status" role="status">Проверка…</p>
+    <pre id="report"></pre>
+    <section id="demo-setup" hidden>
+        <h2>Диагностика карточки демопроекта</h2>
+        <p>Подключает эту диагностику только к указанному демопроекту. Задачи не изменяет.</p>
+        <label>ID демопроекта <input id="demo-group" inputmode="numeric" autocomplete="off"></label>
+        <button id="bind-demo" type="button">Подключить диагностику карточки</button>
+        <pre id="binding-report"></pre>
+        <h2>Проба стандартной формы</h2>
+        <p>Откроет новую стандартную задачу выбранного демопроекта с названием «Проверка контрагента.». Проверьте название и закройте форму без сохранения.</p>
+        <button id="open-task-probe" type="button">Открыть стандартную форму</button>
+        <pre id="navigation-report"></pre>
+    </section>
+    <script>
+        (async () => {
+            const status = document.getElementById("status");
+            const output = document.getElementById("report");
+            if (window.self === window.top) {
+                status.textContent = "Откройте установленное приложение внутри десктопного Б24.";
+                return;
+            }
+            try {
+                const report = await runProbe(window.BX24);
+                status.textContent = report.status === "read_complete"
+                    ? "Чтение выполнено. Открытие и предзаполнение формы задачи этим не подтверждены."
+                    : "Чтение не завершено. Причина указана в отчёте.";
+                output.textContent = JSON.stringify(report, null, 2);
+                if (report.status === "read_complete" && report.context === "DEFAULT"
+                    && report.placements.values.includes("TASK_VIEW_TAB")) {
+                    document.getElementById("demo-setup").hidden = false;
+                    document.getElementById("open-task-probe").onclick = (event) => {
+                        const output = document.getElementById("navigation-report");
+                        event.target.disabled = true;
+                        try {
+                            let callbackReceived = false;
+                            const started = openStandardTaskProbe(window.BX24, {
+                                groupId: document.getElementById("demo-group").value.trim(),
+                                title: "Проверка контрагента.",
+                                onResult: result => {
+                                    callbackReceived = true;
+                                    output.textContent = JSON.stringify(result, null, 2);
+                                    event.target.disabled = false;
+                                },
+                            });
+                            if (!callbackReceived) output.textContent = JSON.stringify(started, null, 2);
+                            if (started.error) event.target.disabled = false;
+                        } catch {
+                            output.textContent = "Укажите корректный ID демопроекта. Переход не выполнен.";
+                            event.target.disabled = false;
+                        }
+                    };
+                    document.getElementById("bind-demo").onclick = async (event) => {
+                        event.target.disabled = true;
+                        try {
+                            const binding = await bindDemoDiagnostic(window.BX24, {
+                                groupId: document.getElementById("demo-group").value.trim(),
+                                handler: window.location.origin + window.location.pathname,
+                            });
+                            document.getElementById("binding-report").textContent = JSON.stringify(binding, null, 2);
+                        } catch {
+                            document.getElementById("binding-report").textContent = "Некорректные параметры. Подключение не выполнено.";
+                        } finally { event.target.disabled = false; }
+                    };
+                }
+            } catch {
+                status.textContent = "Ошибка диагностического приложения. Проверка не выполнена.";
+            }
+        })();
+    </script>
+</body>
+</html>

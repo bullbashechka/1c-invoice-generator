@@ -163,6 +163,10 @@ class OperationHTTPContract(unittest.TestCase):
             with self.assertRaises(ValueError):
                 create_server(self.database, clients, result)
 
+    def test_non_loopback_listener_requires_an_explicit_tls_context(self):
+        with self.assertRaisesRegex(ValueError, 'TLS'):
+            create_server(self.database, self.tokens, self.result_token, host='0.0.0.0')
+
     def test_result_survives_actual_service_process_restart(self):
         self.begin()
         self.assertEqual(200, self.result()[0])
