@@ -94,6 +94,17 @@ class OperationStore:
             connection.execute('UPDATE operations SET state=\'unknown\' WHERE operation_id=?',
                                (operation,))
 
+    def claim_creation(self, operation, base, order):
+        """Reserve the single outbound create before dispatch, durably and atomically."""
+        with self._transaction() as connection:
+            row = self._row(connection, operation)
+            self._context(row, base, order)
+            if row['state'] != 'pending':
+                return False
+            connection.execute('UPDATE operations SET state=\'unknown\' WHERE operation_id=?',
+                               (operation,))
+            return True
+
     def accept_result(self, operation, base, order, task):
         self._task(task)
         with self._transaction() as connection:
