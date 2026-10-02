@@ -82,7 +82,24 @@ class ScenarioFailed(RuntimeError):
     pass
 
 
-def run(port_a: int, port_b: int, output: Path, expected_fingerprint: str) -> dict:
+def make_attempts(conflict: str) -> dict:
+    if conflict not in ('task', 'order', 'operation'):
+        raise ValueError('UNKNOWN_CONFLICT_CASE')
+    attempts = {
+        'orderIds': [str(uuid.uuid4()), str(uuid.uuid4())],
+        'operationIds': [str(uuid.uuid4()), str(uuid.uuid4())],
+        'taskIds': [],
+    }
+    first_task = 2100000100 + secrets.randbelow(10000)
+    attempts['taskIds'] = [str(first_task), str(first_task + 1)]
+    shared = {'task': 'taskIds', 'order': 'orderIds', 'operation': 'operationIds'}[conflict]
+    attempts[shared][1] = attempts[shared][0]
+    return attempts
+
+
+def run(port_a: int, port_b: int, output: Path, expected_fingerprint: str,
+        conflict: str = 'task') -> dict:
+    attempts = make_attempts(conflict)
     if port_a == port_b:
         raise ValueError('TWO_DISTINCT_MCP_PORTS_REQUIRED')
     clients = [MCP(port_a), MCP(port_b)]
@@ -99,9 +116,9 @@ def run(port_a: int, port_b: int, output: Path, expected_fingerprint: str) -> di
         raise RuntimeError('TWO_DISTINCT_ONEC_SESSIONS_REQUIRED')
 
     run_id = uuid.uuid4().hex
-    orders = [str(uuid.uuid4()), str(uuid.uuid4())]
-    operations = [str(uuid.uuid4()), str(uuid.uuid4())]
-    task_id = str(2100000100 + secrets.randbelow(10000))
+    orders = attempts['orderIds']
+    operations = attempts['operationIds']
+    task_ids = attempts['taskIds']
     holder_ready, contender_ready, release = (threading.Event() for _ in range(3))
     aborted = threading.Event()
     timeline = {}
@@ -133,11 +150,13 @@ def run(port_a: int, port_b: int, output: Path, expected_fingerprint: str) -> di
     server_thread.start()
     prelude = f'''Заказ1 = Документы.ЗаказКлиента.ПолучитьСсылку(Новый УникальныйИдентификатор("{orders[0]}"));
 Заказ2 = Документы.ЗаказКлиента.ПолучитьСсылку(Новый УникальныйИдентификатор("{orders[1]}"));
-ЗадачаIdТеста = "{task_id}"; Операция1 = "{operations[0]}"; Операция2 = "{operations[1]}";
+ЗадачаIdТеста = "{task_ids[0]}"; ЗадачаIdВторой = "{task_ids[1]}";
+Операция1 = "{operations[0]}"; Операция2 = "{operations[1]}";
 ПортБарьера = {server.server_port}; ПутьБарьера = "/{run_id}";
 '''
-    report = {'runId': run_id, 'orderIds': orders, 'operationIds': operations,
-              'syntheticTaskId': task_id, 'sessions': probes, 'status': 'started'}
+    report = {'runId': run_id, 'conflict': conflict, 'orderIds': orders,
+              'operationIds': operations, 'syntheticTaskId': task_ids[0],
+              'syntheticTaskIds': task_ids, 'sessions': probes, 'status': 'started'}
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
     scenario_error = None
@@ -204,6 +223,8 @@ def run(port_a: int, port_b: int, output: Path, expected_fingerprint: str) -> di
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--ports', nargs=2, type=int, default=[6003, 6004])
+    parser.add_argument('--conflict', choices=['task', 'order', 'operation'], default='task',
+                        help='The one key shared by the two competing attempts')
     parser.add_argument('--output', type=Path, default=Path('.local/stage-1/register-concurrency-private.json'))
     parser.add_argument('--demo-proof', type=Path, required=True,
                         help='Private read-only execute_code result with baseFingerprint for the authorized demo')
@@ -213,13 +234,14 @@ def main():
     try:
         proof = json.loads(args.demo_proof.read_text(encoding='utf-8'))['response']['result']
         expected_fingerprint = json.loads(proof['content'][0]['text'])['data']['baseFingerprint']
-        report = run(*args.ports, args.output, expected_fingerprint)
+        report = run(*args.ports, args.output, expected_fingerprint, args.conflict)
     except Exception as error:
         # Preflight failures occur before register writes or a barrier server start.
         print(json.dumps({'status': 'preflight_failed', 'errorType': type(error).__name__,
                           'registerWritesStarted': False}))
         raise SystemExit(1)
-    print(json.dumps({'status': report['status'], 'cleanup': report.get('cleanup'),
+    print(json.dumps({'status': report['status'], 'conflict': report['conflict'],
+                      'cleanup': report.get('cleanup'),
                       'cleanupRequired': report.get('cleanupRequired', False)}))
     raise SystemExit(0 if report['status'] == 'STAGE1_REGISTER_CONCURRENCY_GREEN' else 1)
 
