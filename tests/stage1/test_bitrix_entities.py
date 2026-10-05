@@ -75,6 +75,17 @@ class BitrixEntityClientContract(unittest.TestCase):
         self.assertEqual([{'ID':1},{'ID':51}],client.read_messages('30','outgoing'))
         self.assertEqual([0,50],starts)
 
+    def test_employee_can_use_own_oauth_with_management_on_both_private_channels(self):
+        result = self.client.provision_user('30', owner_user_id='30')
+        self.assertEqual({'outgoing':'Q_30','incoming':'R_30'}, result)
+        creates = [params for method, params in self.calls if method == 'entity.add']
+        self.assertEqual(2, len(creates))
+        for params in creates:
+            self.assertEqual({'U30':'X'}, params['ACCESS'])
+        rights = [params for method, params in self.calls if method == 'entity.rights']
+        self.assertEqual(2, len(rights))
+        self.assertTrue(all(params['ACCESS'] == {'U30':'X'} for params in rights))
+
     def test_current_user_id_reads_the_rest_oauth_principal(self):
         self.assertEqual('7', self.client.current_user_id())
         self.assertEqual('user.current', self.calls[-1][0])

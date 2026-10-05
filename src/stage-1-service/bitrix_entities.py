@@ -167,13 +167,16 @@ class BitrixEntityClient:
     def provision_user(self, user_id, *, owner_user_id):
         user_id = _user(user_id)
         owner_user_id = _user(str(owner_user_id))
-        if user_id == owner_user_id:
-            raise EntitySetupError('The technical owner must differ from the employee')
         names = entity_names(user_id)
+        # A service may use the initiating employee's OAuth. Bitrix24 keeps the
+        # current principal's management right; do not overwrite it with R/W
+        # when both roles resolve to the same access code.
+        outgoing_rights = {'U' + user_id:'R', 'U' + owner_user_id:'X'}
+        incoming_rights = {'U' + user_id:'W', 'U' + owner_user_id:'X'}
         self._create_entity(names['outgoing'], 'КА: очередь сотрудника ' + user_id,
-                            {'U' + owner_user_id:'X','U' + user_id:'R'})
+                            outgoing_rights)
         self._create_entity(names['incoming'], 'КА: ответы сотрудника ' + user_id,
-                            {'U' + owner_user_id:'X','U' + user_id:'W'})
+                            incoming_rights)
         return names
 
     def ensure_worker_placement(self, user_id, handler_url, error_handler_url, *,

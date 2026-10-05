@@ -163,7 +163,7 @@ class BitrixEntitySync:
         elif kind == 'heartbeat':
             self._store.renew_task_request(message['operationId'],
                                            message['instanceId'],now=now,
-                                           lease_seconds=30)
+                                           lease_seconds=90)
         elif kind == 'closed':
             self._store.mark_task_request_closed(message['operationId'],
                                                  message['instanceId'],now=now)

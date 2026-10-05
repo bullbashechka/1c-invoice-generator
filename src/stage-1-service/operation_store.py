@@ -15,6 +15,7 @@ class Conflict(Exception):
 class OperationStore:
     _IDENTIFIER = re.compile(r'[A-Za-z0-9_-]{1,128}\Z')
     _MAX_REQUEST_BYTES = 32768
+    _OPEN_TASK_LEASE_SECONDS = 90
 
     def __init__(self, database):
         self.database = str(database)
@@ -530,6 +531,9 @@ class OperationStore:
                                'WHERE operation_id=?', (timestamp,operation))
             self._enqueue_entity_message(connection,base=base,user=request['initiator_id'],
                 operation=operation,message=confirmation,now=timestamp)
+            connection.execute(
+                'UPDATE task_requests SET lease_until=? WHERE operation_id=?',
+                (timestamp + self._OPEN_TASK_LEASE_SECONDS,operation))
             return confirmation
 
     def require_order_check(self, base, operation, instance, *, now=None):
@@ -798,7 +802,9 @@ class OperationStore:
                 if row['delivery_state'] not in allowed[state]:
                     raise Conflict('Invalid task request transition')
                 owner = worker
-                lease = None if state == 'unknown' else row['lease_until']
+                lease = (None if state == 'unknown' else
+                         timestamp + self._OPEN_TASK_LEASE_SECONDS
+                         if state in ('opening','opened') else row['lease_until'])
                 connection.execute(
                     'UPDATE task_requests SET delivery_state=?,lease_owner=?,lease_until=?,'
                     'updated_at=? WHERE operation_id=?',
@@ -819,7 +825,7 @@ class OperationStore:
     def mark_task_request_closed(self, operation, worker, *, now=None):
         return self._mark_request(operation, worker, 'unknown', now=now)
 
-    def renew_task_request(self, operation, worker, *, now=None, lease_seconds=30):
+    def renew_task_request(self, operation, worker, *, now=None, lease_seconds=90):
         self._identifier(operation, 'operation ID')
         self._identifier(worker, 'worker ID')
         timestamp = self._timestamp(now)

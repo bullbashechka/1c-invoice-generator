@@ -2,7 +2,7 @@
 
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-const { buildTaskPath, startBackgroundWorker } = require("../../src/stage-1-diagnostics/background_worker.js");
+const { buildTaskPath, startBackgroundWorker, readWorkplaceProfile } = require("../../src/stage-1-diagnostics/background_worker.js");
 
 function entityItem(message, itemId) {
     return {
@@ -20,15 +20,21 @@ function entityItem(message, itemId) {
     };
 }
 
-function createEnvironment({outgoing = [], desktop = true, frame = true, userId = "30"} = {}) {
+function createEnvironment({outgoing = [], desktop = true, activationAvailable = true,
+    activationFailure = false, activationNeverForeground = false, frame = true, userId = "30",
+    openDelayMs = 0, openResult} = {}) {
     const calls = [];
     const writes = [];
     const store = new Map();
     const timers = new Map();
     let sequence = 0;
+    let timestamp = 100000;
+    let activeTab = false;
+    let foreground = false;
     let openedPath;
     let openCallback;
     let timerCallback;
+    const desktopCalls = [];
     const uuid = () => `id-${++sequence}`;
     const localStorage = {
         getItem(key) { return store.get(key) || null; },
@@ -51,7 +57,13 @@ function createEnvironment({outgoing = [], desktop = true, frame = true, userId 
             }
             callback({error:() => "UNEXPECTED_METHOD", data:() => null});
         },
-        openPath(path, callback) { openedPath = path; openCallback = callback; },
+        openPath(path, callback) {
+            openedPath = path;
+            desktopCalls.push("openPath");
+            openCallback = callback;
+            timestamp += openDelayMs;
+            if (openResult !== undefined) callback(openResult);
+        },
     };
     const windowRef = {
         self:frame ? {} : null,
@@ -61,17 +73,37 @@ function createEnvironment({outgoing = [], desktop = true, frame = true, userId 
         BX24:bx24,
     };
     if (!frame) windowRef.self = windowRef.top = windowRef;
-    if (desktop) windowRef.BXDesktopSystem = {ExecuteCommand() {}};
+    if (desktop) windowRef.BXDesktopSystem = {
+        ExecuteCommand() {},
+        SetActiveTab() {
+            desktopCalls.push("SetActiveTab");
+            if (activationFailure) throw new Error("native activation failed");
+            activeTab = true;
+        },
+        IsActiveTab() { return activeTab; },
+    };
+    if (desktop && activationAvailable) windowRef.BXDesktopWindow = {
+        ExecuteCommand(command) {
+            desktopCalls.push(command);
+            if (activationFailure) throw new Error("native activation failed");
+            if (!activationNeverForeground && command === "show.active") foreground = true;
+        },
+        GetProperty(name) { return name === "isForeground" && foreground; },
+    };
     return {
         calls, writes, localStorage, windowRef, bx24, uuid,
         randomId:uuid,
-        now:()=>100000,
-        setIntervalImpl(callback, interval) { const id = timers.size + 1; timers.set(id, {callback, interval}); return id; },
+        now:()=>timestamp,
+        desktopCalls,
+        advance:milliseconds => { timestamp += milliseconds; },
+        setDesktopState({active, visible}) { activeTab = active; foreground = visible; },
+        waitImpl:async milliseconds => { timestamp += milliseconds; },
+        setIntervalImpl(callback, interval) { timerCallback = callback; const id = timers.size + 1; timers.set(id, {callback, interval}); return id; },
         clearIntervalImpl(id) { timers.delete(id); },
         setTimeoutImpl() { return 1; },
         clearTimeoutImpl() {},
         openedPath:() => openedPath,
-        closeSlider:() => openCallback && openCallback(),
+        closeSlider:() => openCallback && openCallback({result:"close"}),
         captureTimer(callback) { timerCallback = callback; },
         runTimer() { timerCallback && timerCallback(); },
         outgoing,
@@ -84,6 +116,49 @@ const request = entityItem({
     sessionId:"session-1", payload:{TITLE:"ТОО А.", DESCRIPTION:"Заказ 7", GROUP_ID:36},
 }, 1);
 const settings = {enabled:true, standardCardVerified:true, baseId:"base-a"};
+
+test("disabled demo can read the exact profile later used by worker without queue traffic", async () => {
+    const env = createEnvironment();
+    const profile = await readWorkplaceProfile({...settings, enabled:false}, env);
+    assert.deepEqual(profile, {baseId:"base-a", initiatorId:"30", workplaceId:"workplace-1"});
+    assert.deepEqual(env.calls.map(call => call.method), ["user.current"]);
+    assert.equal(env.openedPath(), undefined);
+    const worker = await startBackgroundWorker(settings, env);
+    assert.equal(worker.userId, profile.initiatorId);
+    assert.equal(worker.workplaceId, profile.workplaceId);
+    worker.stop();
+});
+
+test("profile persists its generated workplace and isolates hosting domain and employee", async () => {
+    const env = createEnvironment({userId:"31"});
+    env.windowRef.location = {hostname:"cdn.example"};
+    const first = await readWorkplaceProfile(settings, env);
+    assert.equal(env.localStorage.getItem("stage1.workplace.bitrix24.30"), "workplace-1");
+    assert.equal((await readWorkplaceProfile(settings, env)).workplaceId, first.workplaceId);
+    env.windowRef.location.hostname = "other.example";
+    assert.notEqual((await readWorkplaceProfile(settings, env)).workplaceId, first.workplaceId);
+    assert.equal(env.writes.length, 0);
+});
+
+test("profile refuses browser, missing desktop bridge and corrupted local ID", async () => {
+    for (const options of [{frame:false}, {desktop:false}]) {
+        const env = createEnvironment(options);
+        await assert.rejects(readWorkplaceProfile(settings, env), /browser_refused|desktop_bridge_unavailable|desktop_activation_unavailable/);
+        assert.equal(env.calls.length, 0);
+    }
+    const env = createEnvironment();
+    env.localStorage.setItem("stage1.workplace.bitrix24.30", "invalid/id");
+    await assert.rejects(readWorkplaceProfile(settings, env), /WORKPLACE_ID_UNAVAILABLE/);
+    assert.equal(env.localStorage.getItem("stage1.workplace.bitrix24.30"), "invalid/id");
+});
+
+test("worker refuses to poll when the hidden frame lacks the native activation bridge", async () => {
+    const env = createEnvironment({activationAvailable:false});
+    const worker = await startBackgroundWorker(settings, env);
+    assert.equal(worker.status, "desktop_activation_unavailable");
+    assert.deepEqual(env.calls, []);
+    assert.equal(env.openedPath(), undefined);
+});
 
 function grantFor(worker, sourceRequest = request, type = "grant", expiresAt = 130) {
     const fields = sourceRequest.PROPERTY_VALUES;
@@ -172,6 +247,83 @@ test("request is not opened until a matching one-use permission is read from the
     assert.equal(path.searchParams.get("TAGS"), "КА-op-7");
     assert.deepEqual(env.writes.map(item => item.PROPERTY_VALUES.MESSAGE_TYPE),
         ["claim", "opening", "opened"]);
+    assert.deepEqual(env.desktopCalls, ["SetActiveTab", "show.active", "openPath"]);
+});
+
+test("native activation failure never calls openPath and reports a safe diagnostic code", async () => {
+    const env = createEnvironment({outgoing:[request], activationFailure:true});
+    const worker = await startBackgroundWorker(settings, env);
+    env.outgoing.push(grantFor(worker));
+    await worker.pollOnce();
+    env.outgoing.push(grantFor(worker,request,"open"));
+    await worker.pollOnce();
+    await worker.waitForPendingTransition();
+    assert.equal(env.openedPath(), undefined);
+    const closed = env.writes.find(item => item.PROPERTY_VALUES.MESSAGE_TYPE === "closed");
+    assert.ok(closed);
+    assert.deepEqual(JSON.parse(closed.PROPERTY_VALUES.PAYLOAD_JSON), {code:"DESKTOP_ACTIVATION_FAILED"});
+});
+
+test("native activation is checked after navigation and remains bounded to two seconds", async () => {
+    const env = createEnvironment({outgoing:[request],activationNeverForeground:true});
+    const worker = await startBackgroundWorker(settings, env);
+    env.outgoing.push(grantFor(worker));
+    await worker.pollOnce();
+    env.outgoing.push(grantFor(worker,request,"open"));
+    await worker.pollOnce();
+    await worker.waitForPendingTransition();
+    assert.equal(env.now(),102000);
+    assert.ok(env.openedPath());
+    assert.deepEqual(env.desktopCalls, ["SetActiveTab", "show.active", "openPath"]);
+    const closed = env.writes.find(item => item.PROPERTY_VALUES.MESSAGE_TYPE === "closed");
+    assert.ok(closed);
+    assert.deepEqual(JSON.parse(closed.PROPERTY_VALUES.PAYLOAD_JSON), {code:"DESKTOP_ACTIVATION_TIMEOUT"});
+});
+
+test("openPath error is kept separate from slider close and never reported as opened", async () => {
+    const env = createEnvironment({outgoing:[request], openResult:{result:"error",errorCode:"PATH_NOT_AVAILABLE"}});
+    const worker = await startBackgroundWorker(settings, env);
+    env.outgoing.push(grantFor(worker));
+    await worker.pollOnce();
+    env.outgoing.push(grantFor(worker,request,"open"));
+    await worker.pollOnce();
+    await worker.waitForPendingTransition();
+    assert.ok(env.openedPath());
+    assert.ok(!env.writes.some(item => item.PROPERTY_VALUES.MESSAGE_TYPE === "opened"));
+    const closed = env.writes.find(item => item.PROPERTY_VALUES.MESSAGE_TYPE === "closed");
+    assert.ok(closed);
+    assert.deepEqual(JSON.parse(closed.PROPERTY_VALUES.PAYLOAD_JSON), {code:"PATH_NOT_AVAILABLE"});
+});
+
+test("generic openPath errors never echo arbitrary SDK error text", async () => {
+    const env = createEnvironment({outgoing:[request],
+        openResult:{result:"error",errorCode:"access_token_must_not_be_logged"}});
+    const worker = await startBackgroundWorker(settings, env);
+    env.outgoing.push(grantFor(worker));
+    await worker.pollOnce();
+    env.outgoing.push(grantFor(worker,request,"open"));
+    await worker.pollOnce();
+    await worker.waitForPendingTransition();
+    const closed = env.writes.find(item => item.PROPERTY_VALUES.MESSAGE_TYPE === "closed");
+    assert.deepEqual(JSON.parse(closed.PROPERTY_VALUES.PAYLOAD_JSON), {code:"NAVIGATION_FAILED"});
+    assert.ok(!closed.PROPERTY_VALUES.PAYLOAD_JSON.includes("access_token"));
+});
+
+test("a slow open keeps the first heartbeat tied to the same one-use operation", async () => {
+    const env = createEnvironment({outgoing:[request],openDelayMs:21000});
+    const worker = await startBackgroundWorker(settings, env);
+    env.outgoing.push(grantFor(worker));
+    await worker.pollOnce();
+    env.outgoing.push(grantFor(worker,request,"open"));
+    await worker.pollOnce();
+    env.advance(10000);
+    env.runTimer();
+    await worker.waitForPendingTransition();
+    const opened = env.writes.find(item => item.PROPERTY_VALUES.MESSAGE_TYPE === "opened");
+    const heartbeat = env.writes.find(item => item.PROPERTY_VALUES.MESSAGE_TYPE === "heartbeat");
+    assert.equal(Number(opened.PROPERTY_VALUES.CREATED_AT),121);
+    assert.equal(Number(heartbeat.PROPERTY_VALUES.CREATED_AT),131);
+    assert.equal(heartbeat.PROPERTY_VALUES.OPERATION_ID,"op-7");
 });
 
 test("closing the task slider reports unknown and active slider heartbeats use entity messages", async () => {

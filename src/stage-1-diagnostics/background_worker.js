@@ -3,6 +3,11 @@
 const IDENTIFIER = /^[A-Za-z0-9_-]{1,128}$/;
 const EMPLOYEE_ID = /^[1-9][0-9]{0,9}$/;
 const DEMO_GROUP_ID = "36";
+const DIAGNOSTIC_CODES = new Set([
+    "SLIDER_CLOSED", "PATH_NOT_AVAILABLE", "METHOD_NOT_SUPPORTED_ON_DEVICE",
+    "NAVIGATION_FAILED", "NAVIGATION_RESULT_UNKNOWN", "DESKTOP_ACTIVATION_FAILED",
+    "DESKTOP_ACTIVATION_TIMEOUT", "WORKER_STOPPED", "SDK_CALL_FAILED",
+]);
 
 function randomId(cryptoProvider) {
     if (typeof cryptoProvider?.randomUUID === "function") return cryptoProvider.randomUUID();
@@ -153,6 +158,55 @@ function desktopRefusal(windowRef) {
     return null;
 }
 
+function desktopActivationRefusal(windowRef) {
+    const refusal = desktopRefusal(windowRef);
+    if (refusal) return refusal;
+    if (typeof windowRef.BXDesktopSystem.SetActiveTab !== "function"
+        || typeof windowRef.BXDesktopSystem.IsActiveTab !== "function"
+        || typeof windowRef.BXDesktopWindow?.ExecuteCommand !== "function"
+        || typeof windowRef.BXDesktopWindow.GetProperty !== "function") {
+        return "desktop_activation_unavailable";
+    }
+    return null;
+}
+
+function navigationResultCode(result) {
+    if (result?.result === "close") return "SLIDER_CLOSED";
+    if (result?.result !== "error") return "NAVIGATION_RESULT_UNKNOWN";
+    const code = result.errorCode;
+    return code === "PATH_NOT_AVAILABLE" || code === "METHOD_NOT_SUPPORTED_ON_DEVICE"
+        ? code : "NAVIGATION_FAILED";
+}
+
+function activateDesktopWindow(windowRef) {
+    const system = windowRef?.BXDesktopSystem;
+    const desktopWindow = windowRef?.BXDesktopWindow;
+    try {
+        system.SetActiveTab();
+        desktopWindow.ExecuteCommand("show.active");
+    } catch {
+        return "DESKTOP_ACTIVATION_FAILED";
+    }
+    return null;
+}
+
+async function waitForDesktopActivation(windowRef, environment = {}) {
+    const system = windowRef?.BXDesktopSystem;
+    const desktopWindow = windowRef?.BXDesktopWindow;
+    const wait = environment.waitImpl || (milliseconds => new Promise(resolve =>
+        setTimeout(resolve, milliseconds)));
+    for (let attempt = 0; attempt <= 20; attempt += 1) {
+        try {
+            if (system.IsActiveTab() === true
+                && desktopWindow.GetProperty("isForeground") === true) return null;
+        } catch {
+            return "DESKTOP_ACTIVATION_FAILED";
+        }
+        if (attempt < 20) await wait(100);
+    }
+    return "DESKTOP_ACTIVATION_TIMEOUT";
+}
+
 function validContext(message, worker) {
     return message.baseId === worker.baseId
         && message.initiatorId === worker.userId
@@ -164,28 +218,18 @@ function samePayload(left, right) {
     catch { return false; }
 }
 
-async function startBackgroundWorker(settings, environment = {}) {
-    if (!settings || settings.enabled !== true || settings.standardCardVerified !== true) {
-        return {status:"disabled"};
-    }
+async function readWorkplaceProfile(settings, environment = {}) {
     const windowRef = environment.windowRef || globalThis.window;
     const refusal = desktopRefusal(windowRef);
-    if (refusal) return {status:refusal};
+    if (refusal) throw new Error(refusal);
     const client = environment.client || windowRef.BX24;
     const localStorage = environment.localStorage || windowRef.localStorage;
     const cryptoProvider = environment.cryptoProvider || windowRef.crypto || globalThis.crypto;
-    const setIntervalImpl = environment.setIntervalImpl || globalThis.setInterval;
-    const clearIntervalImpl = environment.clearIntervalImpl || globalThis.clearInterval;
-    const now = environment.now || (() => Date.now());
-    const pollMs = environment.pollMs || 5000;
-    const heartbeatMs = environment.heartbeatMs || 10000;
     if (!client || typeof client.init !== "function" || typeof client.callMethod !== "function"
-        || typeof client.openPath !== "function" || !localStorage
-        || typeof setIntervalImpl !== "function" || typeof clearIntervalImpl !== "function"
-        || typeof now !== "function" || pollMs !== 5000 || heartbeatMs !== 10000) {
+        || !localStorage) {
         throw new Error("WORKER_SDK_UNAVAILABLE");
     }
-    if (String(settings.baseId || "") === "" || !IDENTIFIER.test(settings.baseId)) {
+    if (typeof settings?.baseId !== "string" || !IDENTIFIER.test(settings.baseId)) {
         throw new Error("WORKER_CONFIG_INVALID");
     }
 
@@ -234,6 +278,30 @@ async function startBackgroundWorker(settings, environment = {}) {
     if (typeof workplaceId !== "string" || !IDENTIFIER.test(workplaceId)) {
         throw new Error("WORKPLACE_ID_UNAVAILABLE");
     }
+    return {baseId:settings.baseId, initiatorId:userId, workplaceId};
+}
+
+async function startBackgroundWorker(settings, environment = {}) {
+    if (!settings || settings.enabled !== true || settings.standardCardVerified !== true) {
+        return {status:"disabled"};
+    }
+    const windowRef = environment.windowRef || globalThis.window;
+    const refusal = desktopActivationRefusal(windowRef);
+    if (refusal) return {status:refusal};
+    const client = environment.client || windowRef.BX24;
+    const cryptoProvider = environment.cryptoProvider || windowRef.crypto || globalThis.crypto;
+    const setIntervalImpl = environment.setIntervalImpl || globalThis.setInterval;
+    const clearIntervalImpl = environment.clearIntervalImpl || globalThis.clearInterval;
+    const now = environment.now || (() => Date.now());
+    const pollMs = environment.pollMs || 5000;
+    const heartbeatMs = environment.heartbeatMs || 10000;
+    if (typeof client?.openPath !== "function"
+        || typeof setIntervalImpl !== "function" || typeof clearIntervalImpl !== "function"
+        || typeof now !== "function" || pollMs !== 5000 || heartbeatMs !== 10000) {
+        throw new Error("WORKER_SDK_UNAVAILABLE");
+    }
+    const {initiatorId:userId, workplaceId} = await readWorkplaceProfile(settings, environment);
+    const idFactory = environment.randomId || (() => randomId(cryptoProvider));
     const instanceId = idFactory();
     if (typeof instanceId !== "string" || !IDENTIFIER.test(instanceId) || instanceId === workplaceId) {
         throw new Error("WORKER_ID_UNAVAILABLE");
@@ -289,7 +357,8 @@ async function startBackgroundWorker(settings, environment = {}) {
         messageId:idFactory(), type, operationId:request.operationId,
         baseId:request.baseId, orderId:request.orderId, initiatorId:request.initiatorId,
         workplaceId:request.workplaceId, sessionId:request.sessionId,
-        instanceId, permissionId:extra.permissionId || "", payload:{},
+        instanceId, permissionId:extra.permissionId || "",
+        payload:DIAGNOSTIC_CODES.has(extra.code) ? {code:extra.code} : {},
     });
 
     const stopHeartbeat = () => {
@@ -297,11 +366,13 @@ async function startBackgroundWorker(settings, environment = {}) {
         heartbeatTimer = null;
     };
 
-    const finishOpen = request => {
+    const finishOpen = (request, code) => {
         if (!active || active.operationId !== request.operationId || active.closed) return;
         active.closed = true;
         stopHeartbeat();
-        lastTransition = send(event(request, "closed", {permissionId:active.permissionId}))
+        lastTransition = send(event(request, "closed", {
+            permissionId:active.permissionId, code,
+        }))
             .catch(() => null).finally(() => { active = null; });
     };
 
@@ -328,10 +399,19 @@ async function startBackgroundWorker(settings, environment = {}) {
         permissionUsed.add(grant.permissionId);
         active = {operationId:request.operationId, permissionId:grant.permissionId,
             request, closed:false};
+        const activationError = activateDesktopWindow(windowRef);
+        if (activationError) {
+            finishOpen(request, activationError);
+            return false;
+        }
+        if (stopped) {
+            finishOpen(request, "WORKER_STOPPED");
+            return false;
+        }
         try {
-            client.openPath(path, () => finishOpen(request));
+            client.openPath(path, result => finishOpen(request, navigationResultCode(result)));
         } catch {
-            finishOpen(request);
+            finishOpen(request, "SDK_CALL_FAILED");
             return false;
         }
         if (!active?.closed) {
@@ -342,6 +422,13 @@ async function startBackgroundWorker(settings, environment = {}) {
                         .catch(() => null);
                 }
             }, heartbeatMs);
+        }
+        if (!active?.closed) {
+            const foregroundError = await waitForDesktopActivation(windowRef, environment);
+            if (foregroundError) {
+                finishOpen(request, foregroundError);
+                return false;
+            }
         }
         return true;
     };
@@ -413,4 +500,4 @@ async function startBackgroundWorker(settings, environment = {}) {
     return controller;
 }
 
-if (typeof module !== "undefined") module.exports = {buildTaskPath:taskPath, startBackgroundWorker, desktopRefusal, bitrixCall};
+if (typeof module !== "undefined") module.exports = {buildTaskPath:taskPath, startBackgroundWorker, readWorkplaceProfile, desktopRefusal, desktopActivationRefusal, bitrixCall};

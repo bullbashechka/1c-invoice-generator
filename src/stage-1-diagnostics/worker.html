@@ -17,7 +17,7 @@
                     const info=window.BX24.placement.info();
                     localStorage.setItem("stage1.worker.environment",JSON.stringify({
                         observedAt:new Date().toISOString(),
-                        status:desktopRefusal(window)||"desktop_detected",
+                        status:desktopActivationRefusal(window)||"desktop_detected",
                         placement:info?.placement||"UNKNOWN",
                         handler:window.location.origin+window.location.pathname,
                         enabled:settings.enabled===true,
@@ -33,7 +33,7 @@
                 })
                 .catch(() => { window.STAGE1_WORKER_STATUS = "unavailable"; });
             window.addEventListener("pagehide", () => {
-                worker?.stop();
+                worker?.stop?.();
                 worker = null;
             }, {once:true});
         })();

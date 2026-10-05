@@ -211,6 +211,10 @@ class BitrixEntitySyncContract(unittest.TestCase):
         self.store.heartbeat_1c_session('base-a','30','pc-1','1c-session-1',now=132)
         self.assertIsNone(self.store.claim_active_task_request('base-a','30','pc-1','1c-session-1',
             'window-2',now=132,operation='op-1'))
+        self.assertEqual('opening',self.store.task_request('base-a','op-1')['deliveryState'])
+        self.store.heartbeat_1c_session('base-a','30','pc-1','1c-session-1',now=193)
+        self.assertIsNone(self.store.claim_active_task_request('base-a','30','pc-1','1c-session-1',
+            'window-2',now=193,operation='op-1'))
         self.assertEqual('unknown',self.store.task_request('base-a','op-1')['deliveryState'])
 
     def test_claim_without_fresh_saved_order_validation_waits_without_grant(self):
@@ -237,9 +241,16 @@ class BitrixEntitySyncContract(unittest.TestCase):
             if item['PROPERTY_VALUES']['MESSAGE_TYPE'] == 'open']
         self.assertEqual(1,len(confirmations))
         self.assertLessEqual(float(confirmations[0]['PROPERTY_VALUES']['EXPIRES_AT']),130)
+        self.assertEqual(192,self.store.task_request('base-a','op-1')['leaseUntil'])
         self.sync.sync_once(now=103)
         self.assertEqual(1,len([item for item in self.entities.outgoing['30']
             if item['PROPERTY_VALUES']['MESSAGE_TYPE'] == 'open']))
+        opened = dict(opening,messageId='opened-slow',type='opened')
+        self.entities.incoming['30'].append(as_item(opened,1000))
+        self.sync.sync_once(now=123)
+        self.assertEqual(213,self.store.task_request('base-a','op-1')['leaseUntil'])
+        renewed=self.store.renew_task_request('op-1','window-1',now=133,lease_seconds=90)
+        self.assertEqual(223,renewed['leaseUntil'])
 
     def test_opening_after_session_loss_never_receives_confirmation(self):
         self.claim('window-1')

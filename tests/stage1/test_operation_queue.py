@@ -188,6 +188,33 @@ class TaskRequestQueueContract(unittest.TestCase):
         self.assertIsNone(self.store.claim_task_request(
             'base-a','user-7','pc-11','window-2',now=130,lease_seconds=20))
 
+    def test_opening_opened_and_slow_heartbeat_keep_a_ninety_second_lease(self):
+        self.enqueue()
+        self.store.claim_task_request('base-a','user-7','pc-11','window-1',
+                                      now=100,lease_seconds=30)
+        opening = self.store.mark_task_request_opening('op-1','window-1',now=101)
+        self.assertEqual(191,opening['leaseUntil'])
+        opened = self.store.mark_task_request_opened('op-1','window-1',now=122)
+        self.assertEqual(212,opened['leaseUntil'])
+        renewed = self.store.renew_task_request('op-1','window-1',now=133,lease_seconds=90)
+        self.assertEqual(223,renewed['leaseUntil'])
+        self.assertIsNone(self.store.claim_task_request(
+            'base-a','user-7','pc-11','window-2',now=150,lease_seconds=30))
+
+    def test_ninety_second_lease_still_rejects_wrong_owner_and_expired_heartbeat(self):
+        self.enqueue()
+        self.store.claim_task_request('base-a','user-7','pc-11','window-1',
+                                      now=100,lease_seconds=30)
+        self.store.mark_task_request_opening('op-1','window-1',now=101)
+        self.store.mark_task_request_opened('op-1','window-1',now=102)
+        with self.assertRaises(Conflict):
+            self.store.renew_task_request('op-1','window-2',now=103,lease_seconds=90)
+        with self.assertRaises(Conflict):
+            self.store.renew_task_request('op-1','window-1',now=192,lease_seconds=90)
+        row = self.store.task_request('base-a','op-1')
+        self.assertEqual('unknown',row['deliveryState'])
+        self.assertIsNone(row['leaseUntil'])
+
     def test_expired_dispatch_lease_becomes_unknown_and_is_not_reopened(self):
         self.enqueue()
         self.store.claim_task_request('base-a','user-7','pc-11','window-1',
