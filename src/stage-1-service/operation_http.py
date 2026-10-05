@@ -155,7 +155,7 @@ def create_server(database, client_tokens, result_token, port=0, *,
                 raise RequestError(404, 'not_found')
 
             paths = {'/v1/operations', '/v1/unknown', '/v1/results', '/v1/acknowledgments',
-                     '/v1/task-requests', '/v1/1c/heartbeat'}
+                     '/v1/task-requests', '/v1/1c/heartbeat','/v1/1c/checks','/v1/1c/validate'}
             if self.path not in paths:
                 raise RequestError(404, 'not_found')
             is_result = self.path == '/v1/results'
@@ -164,21 +164,29 @@ def create_server(database, client_tokens, result_token, port=0, *,
             if self.path == '/v1/task-requests':
                 keys = {'baseId', 'orderId', 'operationId', 'initiatorId',
                         'workplaceId', 'sessionId', 'payload'}
-            elif self.path == '/v1/1c/heartbeat':
+            elif self.path in ('/v1/1c/heartbeat','/v1/1c/checks','/v1/1c/validate'):
                 keys = {'baseId','initiatorId','workplaceId','sessionId'}
+                if self.path == '/v1/1c/validate':
+                    keys.update({'orderId','operationId','checkId','eligible','payload'})
             else:
                 keys = {'baseId', 'orderId', 'operationId'}
             if is_result or self.path == '/v1/acknowledgments':
                 keys.add('taskId')
             if set(data) != keys:
                 raise RequestError(400, 'invalid_fields')
-            if self.path == '/v1/1c/heartbeat':
+            if self.path in ('/v1/1c/heartbeat','/v1/1c/checks','/v1/1c/validate'):
                 request_base = identifier(data['baseId'])
                 if request_base not in client_tokens or request_base != base:
                     raise RequestError(403, 'forbidden')
                 initiator = identifier(data['initiatorId'])
                 workplace = identifier(data['workplaceId'])
                 session = identifier(data['sessionId'])
+                if self.path == '/v1/1c/checks':
+                    return {'checks':store.pending_order_checks(request_base,initiator,workplace,session)}
+                if self.path == '/v1/1c/validate':
+                    return store.validate_order_check(request_base,identifier(data['orderId']),
+                        identifier(data['operationId']),initiator,workplace,session,
+                        identifier(data['checkId']),data['eligible'],data['payload'])
                 heartbeat = store.heartbeat_1c_session(
                     request_base, initiator, workplace, session, ttl_seconds=30)
                 return {'sessionId':heartbeat['sessionId'],

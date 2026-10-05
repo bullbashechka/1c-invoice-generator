@@ -104,15 +104,16 @@ class BitrixEntitySync:
     def _grant(self, request, claim, *, now):
         instance_id = claim['instanceId']
         grant_id = self._stable_id('permit', self._base, request['operationId'],
-                                  request['sessionId'], instance_id)
+                                  request['sessionId'], instance_id, request['checkId'])
         grant = {
             'messageId':self._stable_id('grant', self._base, request['operationId'],
-                                        request['sessionId'], instance_id),
+                                        request['sessionId'], instance_id, request['checkId']),
             'type':'grant', 'operationId':request['operationId'], 'baseId':self._base,
             'orderId':claim['orderId'], 'initiatorId':request['initiatorId'],
             'workplaceId':request['workplaceId'], 'sessionId':request['sessionId'],
             'instanceId':instance_id, 'permissionId':grant_id,
-            'payload':request['payload'], 'createdAt':now,
+            'payload':request['payload'], 'createdAt':request['updatedAt'],
+            'expiresAt':request['leaseUntil'],
         }
         self._store.queue_entity_message(self._base, claim['initiatorId'],
                                          request['operationId'], grant, now=now)
@@ -132,17 +133,30 @@ class BitrixEntitySync:
         if kind == 'claim':
             claimed = self._store.claim_active_task_request(
                 self._base, user, message['workplaceId'], message['sessionId'],
-                message['instanceId'], now=now, lease_seconds=30)
+                message['instanceId'], now=now, lease_seconds=30,
+                operation=message['operationId'])
             if claimed is None:
                 return {'accepted':True,'granted':False}
-            self._grant(request, message, now=now)
+            validation = self._store.require_order_check(self._base,message['operationId'],
+                                                         message['instanceId'],now=now)
+            if validation is None:
+                return {'accepted':True,'granted':False,'deferred':True}
+            claimed['payload'] = validation['payload']
+            claimed['checkId'] = validation['checkId']
+            claimed['leaseUntil'] = min(claimed['leaseUntil'],validation['expiresAt'])
+            self._grant(claimed, message, now=now)
             return {'accepted':True,'granted':True}
 
         if request['leaseOwner'] != message['instanceId']:
             raise Conflict('Worker instance does not own the opening lease')
+        expected_permission = self._stable_id('permit', self._base, request['operationId'],
+            request['sessionId'], message['instanceId'],
+            self._store.order_check_id(self._base,request['operationId'],message['instanceId']))
+        if message['permissionId'] != expected_permission:
+            raise Conflict('Worker opening permission does not match')
         if kind == 'opening':
-            self._store.mark_task_request_opening(message['operationId'],
-                                                  message['instanceId'],now=now)
+            self._store.confirm_task_opening(self._base,message['operationId'],
+                message['instanceId'],message['permissionId'],now=now)
         elif kind == 'opened':
             self._store.mark_task_request_opened(message['operationId'],
                                                  message['instanceId'],now=now)
@@ -169,6 +183,8 @@ class BitrixEntitySync:
                         outcome = self._process_worker_message(user,message,now=now)
                     except Conflict:
                         outcome = {'accepted':False,'granted':False}
+                    if outcome.get('deferred'):
+                        continue
                     self._store.mark_entity_message_processed(
                         user,message['messageId'],outcome,now=now)
                     consumed += 1

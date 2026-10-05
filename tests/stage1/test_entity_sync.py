@@ -21,6 +21,7 @@ def as_item(message, item_id):
         'PERMISSION_ID':message.get('permissionId',''),
         'TASK_ID':message.get('taskId',''), 'PAYLOAD_JSON':__import__('json').dumps(
             message.get('payload',{}),ensure_ascii=False), 'CREATED_AT':'100',
+        'EXPIRES_AT':str(message.get('expiresAt','')),
     }
     return {'ID':item_id,'NAME':message['messageId'],'PROPERTY_VALUES':fields}
 
@@ -105,6 +106,15 @@ class BitrixEntitySyncContract(unittest.TestCase):
             'workplaceId':workplace,'sessionId':session,'instanceId':instance,
             'payload':{},
         },100+len(self.entities.incoming['30'])))
+        self.sync.sync_once(now=101)
+        for check in self.store.pending_order_checks('base-a','30',workplace,session,now=101):
+            self.store.validate_order_check('base-a',check['orderId'],check['operationId'],
+                '30',workplace,session,check['checkId'],True,
+                {'TITLE':'Контрагент.','DESCRIPTION':'Заказ 1','GROUP_ID':36},now=101)
+
+    def permission(self,instance):
+        return next(item['PROPERTY_VALUES']['PERMISSION_ID'] for item in self.entities.outgoing['30']
+            if item['PROPERTY_VALUES']['MESSAGE_TYPE']=='grant' and item['PROPERTY_VALUES']['INSTANCE_ID']==instance)
 
     def test_claim_is_granted_only_to_one_worker_instance_on_the_active_workplace(self):
         self.sync.sync_once(now=101)
@@ -132,6 +142,118 @@ class BitrixEntitySyncContract(unittest.TestCase):
                   if item['PROPERTY_VALUES']['MESSAGE_TYPE'] == 'grant']
         self.assertEqual([],grants)
         self.assertEqual('queued',self.store.task_request('base-a','op-1')['deliveryState'])
+
+    def test_second_claim_cannot_get_grant_for_an_operation_without_its_lease(self):
+        self.store.enqueue_task_request('base-a','order-2','op-2','30','pc-1',
+            {'TITLE':'Второй.','GROUP_ID':36},session_id='1c-session-1',now=101)
+        self.claim('window-1')
+        self.sync.sync_once(now=102)
+        self.entities.incoming['30'].append(as_item({
+            'messageId':'claim-second','type':'claim','operationId':'op-2',
+            'baseId':'base-a','orderId':'order-2','initiatorId':'30',
+            'workplaceId':'pc-1','sessionId':'1c-session-1','instanceId':'window-1','payload':{},
+        },999))
+        self.sync.sync_once(now=103)
+        grants = [item['PROPERTY_VALUES']['OPERATION_ID'] for item in self.entities.outgoing['30']
+                  if item['PROPERTY_VALUES']['MESSAGE_TYPE'] == 'grant']
+        self.assertEqual(['op-1'],grants)
+
+    def test_forged_permission_cannot_advance_opening(self):
+        self.claim('window-1')
+        self.sync.sync_once(now=101)
+        self.entities.incoming['30'].append(as_item({
+            'messageId':'forged','type':'opening','operationId':'op-1',
+            'baseId':'base-a','orderId':'order-1','initiatorId':'30',
+            'workplaceId':'pc-1','sessionId':'1c-session-1','instanceId':'window-1',
+            'permissionId':'wrong-permission','payload':{},
+        },999))
+        self.sync.sync_once(now=102)
+        self.assertEqual('claimed',self.store.task_request('base-a','op-1')['deliveryState'])
+
+    def test_unopened_expired_claim_recovers_same_operation_with_new_check(self):
+        self.claim('window-1'); self.sync.sync_once(now=102)
+        old=self.store.task_request('base-a','op-1')
+        self.store.heartbeat_1c_session('base-a','30','pc-1','1c-session-1',now=132)
+        recovered=self.store.claim_active_task_request('base-a','30','pc-1','1c-session-1',
+            'window-2',now=132,operation='op-1')
+        self.assertIsNotNone(recovered)
+        self.assertEqual('op-1',recovered['operationId'])
+        self.assertIsNone(self.store.require_order_check('base-a','op-1','window-2',now=132))
+        checks=self.store.pending_order_checks('base-a','30','pc-1','1c-session-1',now=132)
+        self.assertEqual(1,len(checks))
+        self.assertEqual('claimed',self.store.task_request('base-a','op-1')['deliveryState'])
+
+    def test_1c_restart_recovers_unopened_claim_and_rebinds_original_operation(self):
+        self.claim('window-1');self.sync.sync_once(now=102)
+        self.store.heartbeat_1c_session('base-a','30','pc-1','new-session',now=132)
+        row=self.store.task_request('base-a','op-1')
+        self.assertEqual(('queued','new-session'),(row['deliveryState'],row['sessionId']))
+        self.assertIsNotNone(self.store.claim_active_task_request('base-a','30','pc-1','new-session',
+            'window-2',now=133,operation='op-1'))
+
+    def test_rejected_order_can_be_checked_again_without_reusing_challenge(self):
+        self.store.claim_active_task_request('base-a','30','pc-1','1c-session-1','window-1',now=101)
+        self.store.require_order_check('base-a','op-1','window-1',now=101)
+        first=self.store.pending_order_checks('base-a','30','pc-1','1c-session-1',now=101)[0]
+        self.store.validate_order_check('base-a','order-1','op-1','30','pc-1','1c-session-1',
+            first['checkId'],False,{},now=102)
+        self.assertIsNone(self.store.require_order_check('base-a','op-1','window-1',now=112))
+        second=self.store.pending_order_checks('base-a','30','pc-1','1c-session-1',now=112)[0]
+        self.assertNotEqual(first['checkId'],second['checkId'])
+        from operation_store import Conflict
+        with self.assertRaises(Conflict):
+            self.store.validate_order_check('base-a','order-1','op-1','30','pc-1','1c-session-1',
+                first['checkId'],True,{'TITLE':'Late.','GROUP_ID':36},now=112)
+
+    def test_possible_opening_is_not_requeued_after_expiry(self):
+        self.claim('window-1');self.sync.sync_once(now=102)
+        self.store.confirm_task_opening('base-a','op-1','window-1',self.permission('window-1'),now=103)
+        self.store.heartbeat_1c_session('base-a','30','pc-1','1c-session-1',now=132)
+        self.assertIsNone(self.store.claim_active_task_request('base-a','30','pc-1','1c-session-1',
+            'window-2',now=132,operation='op-1'))
+        self.assertEqual('unknown',self.store.task_request('base-a','op-1')['deliveryState'])
+
+    def test_claim_without_fresh_saved_order_validation_waits_without_grant(self):
+        self.entities.incoming['30'].append(as_item({
+            'messageId':'unchecked','type':'claim','operationId':'op-1',
+            'baseId':'base-a','orderId':'order-1','initiatorId':'30','workplaceId':'pc-1',
+            'sessionId':'1c-session-1','instanceId':'window-1','payload':{},
+        },999))
+        self.sync.sync_once(now=101)
+        self.assertEqual([], [item for item in self.entities.outgoing['30']
+            if item['PROPERTY_VALUES']['MESSAGE_TYPE'] == 'grant'])
+
+    def test_opening_requires_live_session_and_produces_durable_confirmation(self):
+        self.claim('window-1')
+        self.sync.sync_once(now=101)
+        opening = {'messageId':'opening-valid','type':'opening','operationId':'op-1',
+            'baseId':'base-a','orderId':'order-1','initiatorId':'30',
+            'workplaceId':'pc-1','sessionId':'1c-session-1','instanceId':'window-1',
+            'permissionId':self.permission('window-1'),
+            'payload':{}}
+        self.entities.incoming['30'].append(as_item(opening,999))
+        self.sync.sync_once(now=102)
+        confirmations=[item for item in self.entities.outgoing['30']
+            if item['PROPERTY_VALUES']['MESSAGE_TYPE'] == 'open']
+        self.assertEqual(1,len(confirmations))
+        self.assertLessEqual(float(confirmations[0]['PROPERTY_VALUES']['EXPIRES_AT']),130)
+        self.sync.sync_once(now=103)
+        self.assertEqual(1,len([item for item in self.entities.outgoing['30']
+            if item['PROPERTY_VALUES']['MESSAGE_TYPE'] == 'open']))
+
+    def test_opening_after_session_loss_never_receives_confirmation(self):
+        self.claim('window-1')
+        self.sync.sync_once(now=101)
+        self.store.heartbeat_1c_session('base-a','30','pc-1','1c-session-1',now=60)
+        self.entities.incoming['30'].append(as_item({
+            'messageId':'stale-opening','type':'opening','operationId':'op-1',
+            'baseId':'base-a','orderId':'order-1','initiatorId':'30',
+            'workplaceId':'pc-1','sessionId':'1c-session-1','instanceId':'window-1',
+            'permissionId':self.permission('window-1'),
+            'payload':{},
+        },999))
+        self.sync.sync_once(now=102)
+        self.assertEqual('claimed',self.store.task_request('base-a','op-1')['deliveryState'])
 
     def test_duplicate_claim_event_and_service_restart_do_not_change_lease_owner(self):
         self.claim('window-1',message_id='claim-same')
@@ -167,6 +289,7 @@ class BitrixEntitySyncContract(unittest.TestCase):
                 'operationId':'op-1','baseId':'base-a','orderId':'order-1',
                 'initiatorId':'30','workplaceId':'pc-1','sessionId':'1c-session-1',
                 'instanceId':'window-1','payload':{},
+                'permissionId':self.permission('window-1'),
             },200+index))
         self.sync.sync_once(now=102)
         self.assertEqual('unknown',self.store.task_request('base-a','op-1')['deliveryState'])

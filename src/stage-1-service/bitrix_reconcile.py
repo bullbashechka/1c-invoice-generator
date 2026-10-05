@@ -69,7 +69,7 @@ class BitrixRESTClient:
         self._transport = _post_json if transport is None else transport
         self._timeout = timeout
 
-    def _call(self, method, parameters):
+    def _call(self, method, parameters, *, pagination=False):
         if method not in ('tasks.task.get', 'tasks.task.list', 'user.current'):
             raise ValueError('Only configured Bitrix24 identity and task reads are supported')
         try:
@@ -96,7 +96,7 @@ class BitrixRESTClient:
             if not isinstance(code, str) or not re.fullmatch(r'[A-Za-z0-9_.-]{1,80}', code):
                 code = 'API_ERROR'
             raise BitrixAPIRejected(code)
-        return data.get('result')
+        return (data.get('result'), data.get('next')) if pagination else data.get('result')
 
     @staticmethod
     def _task_id(value, *, allow_string=True):
@@ -112,6 +112,18 @@ class BitrixRESTClient:
     @staticmethod
     def _tags(task):
         tags = task.get('tags', task.get('TAGS'))
+        if isinstance(tags, dict) and all(isinstance(key, str) and re.fullmatch(r'[0-9]+',key)
+                                          for key in tags):
+            values = []
+            for key, value in tags.items():
+                if isinstance(value, str):
+                    values.append(value)
+                elif (isinstance(value, dict) and type(value.get('id')) is int
+                      and str(value['id']) == key and isinstance(value.get('title'), str)):
+                    values.append(value['title'])
+                else:
+                    raise CorrelationUnavailable('Task response does not contain readable tags')
+            tags = values
         if not isinstance(tags, list) or any(not isinstance(tag, str) for tag in tags):
             raise CorrelationUnavailable('Task response does not contain readable tags')
         return tags
@@ -145,9 +157,9 @@ class BitrixRESTClient:
         matches = set()
         start = 0
         for _ in range(self._MAX_TAG_SEARCH_PAGES):
-            result = self._call('tasks.task.list', {
+            result, next_start = self._call('tasks.task.list', {
                 'filter': {'TAG':tag}, 'select':['ID','TAGS'], 'start':start,
-            })
+            }, pagination=True)
             tasks = result.get('tasks') if isinstance(result, dict) else None
             if not isinstance(tasks, list) or len(tasks) > 50:
                 raise ResultUnknown('Bitrix24 tag search response is invalid')
@@ -157,7 +169,6 @@ class BitrixRESTClient:
                 task_id = self._task_id(task.get('id', task.get('ID')))
                 if tag in self._tags(task):
                     matches.add(task_id)
-            next_start = result.get('next')
             if next_start is None:
                 return sorted(matches)
             if type(next_start) is not int or next_start <= start:

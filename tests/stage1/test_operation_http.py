@@ -12,6 +12,7 @@ import unittest
 SOURCE = Path(__file__).resolve().parents[2] / 'src/stage-1-service'
 sys.path.insert(0, str(SOURCE))
 from operation_http import create_server
+from operation_store import OperationStore
 
 
 class OperationHTTPContract(unittest.TestCase):
@@ -162,6 +163,26 @@ class OperationHTTPContract(unittest.TestCase):
                                  secrets.token_urlsafe(32))):
             with self.assertRaises(ValueError):
                 create_server(self.database, clients, result)
+
+    def test_1c_reads_addressed_order_challenge_and_submits_saved_snapshot(self):
+        context={'baseId':'base-a','initiatorId':'30','workplaceId':'pc-1','sessionId':'session-1'}
+        token=self.tokens['base-a']
+        self.assertEqual(200,self.request('POST','/v1/1c/heartbeat',context,token)[0])
+        request={**context,'orderId':'order-1','operationId':'op-1','payload':{'TITLE':'Old.','GROUP_ID':36}}
+        self.assertEqual(200,self.request('POST','/v1/task-requests',request,token)[0])
+        store=OperationStore(self.database)
+        store.claim_active_task_request('base-a','30','pc-1','session-1','instance-1',operation='op-1')
+        store.require_order_check('base-a','op-1','instance-1')
+        status,response=self.request('POST','/v1/1c/checks',context,token)
+        self.assertEqual(200,status)
+        check=response['checks'][0]
+        validation={**context,'orderId':'order-1','operationId':'op-1','checkId':check['checkId'],
+                    'eligible':True,'payload':{'TITLE':'Saved.','GROUP_ID':36}}
+        for _ in range(2):
+            self.assertEqual(200,self.request('POST','/v1/1c/validate',validation,token)[0])
+        self.assertEqual([],self.request('POST','/v1/1c/checks',context,token)[1]['checks'])
+        self.assertEqual(403,self.request('POST','/v1/1c/validate',validation,self.tokens['base-b'])[0])
+        self.assertEqual('Saved.',store.require_order_check('base-a','op-1','instance-1')['payload']['TITLE'])
 
     def test_non_loopback_listener_requires_an_explicit_tls_context(self):
         with self.assertRaisesRegex(ValueError, 'TLS'):

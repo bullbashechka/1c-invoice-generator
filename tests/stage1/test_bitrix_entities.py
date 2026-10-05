@@ -65,6 +65,16 @@ class BitrixEntityClientContract(unittest.TestCase):
         self.assertTrue(all('AU' not in params['ACCESS'] for params in creates))
         self.assertTrue(all('U30' in params['ACCESS'] for params in creates))
 
+    def test_entity_scan_reads_rest_top_level_pagination(self):
+        import json
+        starts=[]
+        def transport(url,body,timeout):
+            start=json.loads(body).get('start',0);starts.append(start)
+            return {'result':[{'ID':start+1}], **({'next':50} if start==0 else {})}
+        client=BitrixEntityClient('https://portal.example.test',lambda:'private-token',transport=transport)
+        self.assertEqual([{'ID':1},{'ID':51}],client.read_messages('30','outgoing'))
+        self.assertEqual([0,50],starts)
+
     def test_current_user_id_reads_the_rest_oauth_principal(self):
         self.assertEqual('7', self.client.current_user_id())
         self.assertEqual('user.current', self.calls[-1][0])

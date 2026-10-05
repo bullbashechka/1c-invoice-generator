@@ -25,13 +25,10 @@ function taskPath(message) {
         || String(payload.GROUP_ID) !== DEMO_GROUP_ID) {
         throw new Error("INVALID_TASK_FIELDS");
     }
-    const query = new URLSearchParams({
-        TITLE:title,
-        DESCRIPTION:description,
-        GROUP_ID:DEMO_GROUP_ID,
-        TAGS:`КА-${operationId}`,
-    }).toString();
-    // B24's task slider decodes the whole nested query before parsing form fields.
+    // Live TaskMappers decodes TITLE, but not TAGS or DESCRIPTION. Keep the tag
+    // raw after AppLayout's decode. Description remains manual: raw query values
+    // cannot safely represent an arbitrary saved order containing '&' or '#'.
+    const query = `TITLE=${encodeURIComponent(title)}&GROUP_ID=${DEMO_GROUP_ID}&TAGS=КА-${operationId}`;
     return `/workgroups/group/${DEMO_GROUP_ID}/tasks/task/edit/0/?${encodeURIComponent(query)}`;
 }
 
@@ -74,6 +71,7 @@ function decodeMessage(item) {
         sessionId:fields.SESSION_ID,
         instanceId:fields.INSTANCE_ID || "",
         permissionId:fields.PERMISSION_ID || "",
+        expiresAt:Number(fields.EXPIRES_AT || 0),
         payload,
     };
     for (const key of ["messageId", "operationId", "baseId", "orderId", "workplaceId", "sessionId"]) {
@@ -119,6 +117,29 @@ function normalizeItems(value) {
     if (Array.isArray(value)) return value;
     if (value && typeof value === "object" && Array.isArray(value.items)) return value.items;
     throw new Error("BITRIX_ENTITY_LIST_INVALID");
+}
+
+function bitrixItems(client, parameters, environment) {
+    return new Promise((resolve,reject) => {
+        const items=[];
+        let pages=0;
+        const clear=environment.clearTimeoutImpl || globalThis.clearTimeout;
+        const timer=(environment.setTimeoutImpl || globalThis.setTimeout)(()=>reject(new Error("BITRIX_REST_TIMEOUT")),10000);
+        const page=result=>{
+            try {
+                if(result.error()) throw new Error("BITRIX_REST_REJECTED");
+                const values=normalizeItems(result.data());
+                if(values.length>50) throw new Error("BITRIX_ENTITY_LIST_INVALID");
+                items.push(...values);
+                if(result.more?.()) {
+                    if(++pages>=200) throw new Error("BITRIX_ENTITY_SCAN_LIMIT");
+                    result.next(page);
+                } else {clear(timer);resolve(items);}
+            } catch(error) {clear(timer);reject(error);}
+        };
+        try {client.callMethod("entity.item.get",parameters,page);}
+        catch(error) {clear(timer);reject(error);}
+    });
 }
 
 function desktopRefusal(windowRef) {
@@ -220,17 +241,19 @@ async function startBackgroundWorker(settings, environment = {}) {
     const worker = {baseId:settings.baseId, userId, workplaceId, instanceId};
     const outgoingEntity = `Q_${userId}`;
     const incomingEntity = `R_${userId}`;
-    const claimSent = new Set();
+    const claimSent = new Map();
     const permissionUsed = new Set();
     let stopped = false;
     let polling = false;
     let active = null;
+    let awaiting = null;
     let heartbeatTimer = null;
     let lastTransition = Promise.resolve();
 
-    const readOutgoing = async () => normalizeItems(await bitrixCall(client, "entity.item.get", {
+    const readOutgoing = async () => (await bitrixItems(client, {
         ENTITY:outgoingEntity,
         SORT:{ID:"ASC"},
+        start:0,
     }, environment)).map(decodeMessage);
 
     const send = async (message) => {
@@ -282,23 +305,29 @@ async function startBackgroundWorker(settings, environment = {}) {
             .catch(() => null).finally(() => { active = null; });
     };
 
-    const openGranted = async (request, grant) => {
+    const openGranted = async (request, grant, confirmed = false) => {
         if (active || stopped || permissionUsed.has(grant.permissionId)) return false;
         if (!validContext(request, worker) || !validContext(grant, worker)
-            || grant.type !== "grant" || grant.operationId !== request.operationId
+            || grant.type !== (confirmed ? "open" : "grant") || grant.operationId !== request.operationId
             || grant.orderId !== request.orderId || grant.sessionId !== request.sessionId
             || grant.instanceId !== instanceId || !grant.permissionId
-            || !samePayload(grant.payload, request.payload)) return false;
-        const path = taskPath(request);
+            || !Number.isFinite(grant.expiresAt) || grant.expiresAt <= now() / 1000
+            ) return false;
+        const path = taskPath(grant);
+        if (!confirmed) {
+            awaiting = {request,grant};
+            try {await send(event(request, "opening", {permissionId:grant.permissionId}));}
+            catch {awaiting = null;}
+            if (stopped) awaiting = null;
+            return false;
+        }
+        if (!awaiting || awaiting.grant.permissionId !== grant.permissionId
+            || awaiting.request.operationId !== request.operationId
+            || !samePayload(awaiting.grant.payload,grant.payload)) return false;
+        awaiting = null;
         permissionUsed.add(grant.permissionId);
         active = {operationId:request.operationId, permissionId:grant.permissionId,
             request, closed:false};
-        try {
-            await send(event(request, "opening", {permissionId:grant.permissionId}));
-        } catch {
-            active = null;
-            return false;
-        }
         try {
             client.openPath(path, () => finishOpen(request));
         } catch {
@@ -329,6 +358,20 @@ async function startBackgroundWorker(settings, environment = {}) {
             polling = true;
             try {
                 const messages = await readOutgoing();
+                if (stopped) return {status:"stopped"};
+                if (awaiting) {
+                    if (awaiting.grant.expiresAt <= now() / 1000) {
+                        permissionUsed.add(awaiting.grant.permissionId);
+                        awaiting = null;
+                        return {status:"permission_expired"};
+                    }
+                    const confirmation = messages.find(message=>message.type === "open"
+                        && message.permissionId === awaiting.grant.permissionId);
+                    if (confirmation && await openGranted(awaiting.request,confirmation,true)) {
+                        return {status:"opening",operationId:confirmation.operationId};
+                    }
+                    return {status:"awaiting_confirmation"};
+                }
                 const requests = new Map();
                 for (const message of messages) {
                     if (message.type === "request" && validContext(message, worker)) {
@@ -336,17 +379,21 @@ async function startBackgroundWorker(settings, environment = {}) {
                     }
                 }
                 for (const request of requests.values()) {
-                    if (claimSent.has(request.operationId)) continue;
-                    claimSent.add(request.operationId);
+                    if (stopped) return {status:"stopped"};
+                    const key = `${request.operationId}:${request.sessionId}`;
+                    const previous = claimSent.get(key);
+                    if (previous !== undefined && now() - previous < heartbeatMs) continue;
+                    claimSent.set(key, now());
                     try { await send(event(request, "claim")); }
-                    catch { claimSent.delete(request.operationId); }
+                    catch { claimSent.delete(key); }
                 }
                 for (const grant of messages) {
                     if (grant.type !== "grant" || grant.instanceId !== instanceId
                         || !validContext(grant, worker)) continue;
                     const request = requests.get(grant.operationId);
                     if (!request) continue;
-                    if (await openGranted(request, grant)) return {status:"opening", operationId:grant.operationId};
+                    await openGranted(request, grant);
+                    if (awaiting) return {status:"awaiting_confirmation",operationId:grant.operationId};
                 }
                 return {status:"idle"};
             } catch {
@@ -356,6 +403,7 @@ async function startBackgroundWorker(settings, environment = {}) {
         async waitForPendingTransition() { await lastTransition; },
         stop() {
             stopped = true;
+            awaiting = null;
             stopHeartbeat();
             if (pollTimer !== null) clearIntervalImpl(pollTimer);
             if (active && !active.closed) finishOpen(active.request);
@@ -365,4 +413,4 @@ async function startBackgroundWorker(settings, environment = {}) {
     return controller;
 }
 
-if (typeof module !== "undefined") module.exports = {buildTaskPath:taskPath, startBackgroundWorker};
+if (typeof module !== "undefined") module.exports = {buildTaskPath:taskPath, startBackgroundWorker, desktopRefusal, bitrixCall};

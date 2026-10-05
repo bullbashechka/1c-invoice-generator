@@ -21,7 +21,7 @@ _MESSAGE_ID = re.compile(r'[A-Za-z0-9_-]{1,128}\Z')
 _OPERATION_ID = re.compile(r'[A-Za-z0-9_-]{1,128}\Z')
 _MESSAGE_TYPES = {
     'request', 'claim', 'grant', 'claim_denied', 'opening', 'opened',
-    'heartbeat', 'closed', 'result', 'acknowledged',
+    'heartbeat', 'closed', 'result', 'acknowledged', 'open',
 }
 _PROPERTIES = (
     ('MESSAGE_ID','Message ID'), ('MESSAGE_TYPE','Message type'),
@@ -30,6 +30,7 @@ _PROPERTIES = (
     ('WORKPLACE_ID','Workplace ID'), ('SESSION_ID','1C session ID'),
     ('INSTANCE_ID','Worker instance ID'), ('PERMISSION_ID','Opening permission ID'),
     ('TASK_ID','Task ID'), ('PAYLOAD_JSON','Payload JSON'), ('CREATED_AT','Created at'),
+    ('EXPIRES_AT','Permission expires at'),
 )
 
 
@@ -102,7 +103,7 @@ class BitrixEntityClient:
         self._transport = _default_transport if transport is None else transport
         self._timeout = float(timeout)
 
-    def call(self, method, parameters):
+    def call(self, method, parameters, *, pagination=False):
         if method not in {
             'entity.add','entity.rights','entity.item.property.add','entity.item.add',
             'entity.item.get','placement.get','placement.bind','user.current',
@@ -129,7 +130,7 @@ class BitrixEntityClient:
             raise EntitySetupError('Bitrix24 REST rejected ' + method + ': ' + error)
         if 'result' not in response:
             raise EntitySetupError('Bitrix24 REST response is incomplete')
-        return response['result']
+        return (response['result'],response.get('next')) if pagination else response['result']
 
     def current_user_id(self):
         result = self.call('user.current', {})
@@ -220,7 +221,7 @@ class BitrixEntityClient:
             raise EntitySetupError('Unknown Bitrix24 employee channel')
         if not isinstance(message, dict) or set(message) - {
             'messageId','type','operationId','baseId','orderId','initiatorId',
-            'workplaceId','sessionId','instanceId','permissionId','taskId','payload','createdAt',
+            'workplaceId','sessionId','instanceId','permissionId','taskId','payload','createdAt','expiresAt',
         }:
             raise EntitySetupError('Invalid Bitrix24 channel message')
         message_id = message.get('messageId')
@@ -251,6 +252,7 @@ class BitrixEntityClient:
             'PERMISSION_ID':str(message.get('permissionId','')),
             'TASK_ID':str(message.get('taskId','')), 'PAYLOAD_JSON':payload_json,
             'CREATED_AT':str(message.get('createdAt','')),
+            'EXPIRES_AT':str(message.get('expiresAt','')),
         }
         if any(len(value.encode('utf-8')) > 32768 for value in property_values.values()):
             raise EntitySetupError('Bitrix24 channel field is too large')
@@ -313,12 +315,19 @@ class BitrixEntityClient:
         names = entity_names(user_id)
         if direction not in names:
             raise EntitySetupError('Unknown Bitrix24 employee channel')
-        result = self.call('entity.item.get', {'ENTITY':names[direction],
-                                               'SORT':{'ID':'ASC'}})
-        if isinstance(result, dict) and isinstance(result.get('items'), list):
-            result = result['items']
-        if not isinstance(result, list):
-            raise EntitySetupError('Bitrix24 channel item list is invalid')
-        if len(result) > 10000:
-            raise EntitySetupError('Bitrix24 channel item list exceeded the scan limit')
-        return result
+        items = []
+        start = 0
+        for _ in range(200):
+            result, next_start = self.call('entity.item.get', {'ENTITY':names[direction],
+                'SORT':{'ID':'ASC'},'start':start},pagination=True)
+            if isinstance(result, dict) and isinstance(result.get('items'), list):
+                result = result['items']
+            if not isinstance(result, list) or len(result) > 50:
+                raise EntitySetupError('Bitrix24 channel item list is invalid')
+            items.extend(result)
+            if next_start is None:
+                return items
+            if type(next_start) is not int or next_start <= start:
+                raise EntitySetupError('Bitrix24 channel pagination is invalid')
+            start = next_start
+        raise EntitySetupError('Bitrix24 channel item list exceeded the scan limit')

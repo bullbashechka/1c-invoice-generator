@@ -12,6 +12,18 @@
     <script>
         (() => {
             const settings = window.STAGE1_WORKER_CONFIG || {};
+            window.BX24?.init(() => {
+                try {
+                    const info=window.BX24.placement.info();
+                    localStorage.setItem("stage1.worker.environment",JSON.stringify({
+                        observedAt:new Date().toISOString(),
+                        status:desktopRefusal(window)||"desktop_detected",
+                        placement:info?.placement||"UNKNOWN",
+                        handler:window.location.origin+window.location.pathname,
+                        enabled:settings.enabled===true,
+                    }));
+                } catch { /* Environment diagnosis does not enable processing. */ }
+            });
             let worker = null;
             window.STAGE1_WORKER_STATUS = "starting";
             startBackgroundWorker(settings, {windowRef:window, client:window.BX24})

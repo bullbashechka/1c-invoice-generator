@@ -85,6 +85,17 @@ class OperationStore:
                     created_at REAL NOT NULL,
                     FOREIGN KEY(operation_id) REFERENCES operations(operation_id)
                 );
+                CREATE TABLE IF NOT EXISTS order_checks (
+                    operation_id TEXT PRIMARY KEY REFERENCES operations(operation_id),
+                    check_id TEXT NOT NULL UNIQUE,
+                    session_id TEXT NOT NULL,
+                    instance_id TEXT NOT NULL,
+                    status TEXT NOT NULL CHECK(status IN ('pending','valid','rejected')),
+                    payload_json TEXT,
+                    created_at REAL NOT NULL,
+                    validated_at REAL,
+                    expires_at REAL
+                );
             ''')
             columns = {row['name'] for row in connection.execute(
                 'PRAGMA table_info(task_requests)').fetchall()}
@@ -348,6 +359,29 @@ class OperationStore:
                                          (row['operation_id'],)).fetchone()
             return self._task_request(claimed)
 
+    def _recover_expired_claims(self, connection, base, initiator, workplace, timestamp):
+        expired = connection.execute(
+            'SELECT r.operation_id,r.delivery_state FROM task_requests r JOIN operations o USING(operation_id) '
+            'WHERE o.base_id=? AND r.initiator_id=? AND r.workplace_id=? '
+            'AND r.delivery_state IN (\'claimed\',\'opening\',\'opened\') '
+            'AND r.lease_until<=?', (base, initiator, workplace, timestamp)).fetchall()
+        for item in expired:
+            # Only a persisted open confirmation makes an opening possible.
+            # A claim without that confirmation can safely be authorized again.
+            unopened = (item['delivery_state'] == 'claimed' and connection.execute(
+                "SELECT 1 FROM entity_outbox WHERE operation_id=? AND message_type='open'",
+                (item['operation_id'],)).fetchone() is None)
+            state = 'queued' if unopened else 'unknown'
+            connection.execute(
+                'UPDATE task_requests SET delivery_state=?,lease_owner=NULL,'
+                'lease_until=NULL,updated_at=? WHERE operation_id=?',
+                (state,timestamp, item['operation_id']))
+            if unopened:
+                connection.execute('DELETE FROM order_checks WHERE operation_id=?',
+                                   (item['operation_id'],))
+                connection.execute("UPDATE entity_outbox SET state='superseded' "
+                    "WHERE operation_id=? AND message_type='grant'",(item['operation_id'],))
+
     def heartbeat_1c_session(self, base, initiator, workplace, session, *, now=None,
                              ttl_seconds=30):
         """Record the active 1C session and rebind only requests still waiting to open."""
@@ -359,6 +393,11 @@ class OperationStore:
                 or not 10 <= ttl_seconds <= 300:
             raise Conflict('Invalid 1C session lease')
         with self._transaction() as connection:
+            owner = connection.execute('SELECT session_id,expires_at FROM active_1c_sessions '
+                'WHERE base_id=? AND initiator_id=? AND workplace_id=?',
+                (base,initiator,workplace)).fetchone()
+            if owner is not None and owner['session_id'] != session and owner['expires_at'] > timestamp:
+                raise Conflict('Workplace already belongs to a live 1C session')
             connection.execute(
                 'INSERT INTO active_1c_sessions(base_id,initiator_id,workplace_id,'
                 'session_id,last_seen,expires_at) VALUES (?,?,?,?,?,?) '
@@ -366,6 +405,7 @@ class OperationStore:
                 'session_id=excluded.session_id,last_seen=excluded.last_seen,'
                 'expires_at=excluded.expires_at',
                 (base, initiator, workplace, session, timestamp, timestamp + ttl_seconds))
+            self._recover_expired_claims(connection, base, initiator, workplace, timestamp)
             waiting = connection.execute(
                 'SELECT r.*,o.base_id,o.order_id FROM task_requests r '
                 'JOIN operations o USING(operation_id) WHERE o.base_id=? '
@@ -384,13 +424,15 @@ class OperationStore:
                     'expiresAt':timestamp + ttl_seconds}
 
     def claim_active_task_request(self, base, initiator, workplace, session, instance,
-                                  *, now=None, lease_seconds=30):
+                                  *, now=None, lease_seconds=30, operation=None):
         """Atomically require the live 1C session and claim its request for one worker frame."""
         for value, name in ((base, 'base ID'), (initiator, 'initiator ID'),
                             (workplace, 'workplace ID'), (session, '1C session ID'),
                             (instance, 'worker instance ID')):
             self._identifier(value, name)
         timestamp = self._timestamp(now)
+        if operation is not None:
+            self._identifier(operation, 'operation ID')
         if type(lease_seconds) not in (int, float) or not math.isfinite(lease_seconds) \
                 or not 1 <= lease_seconds <= 300:
             raise Conflict('Invalid lease duration')
@@ -402,16 +444,7 @@ class OperationStore:
             if (current is None or current['session_id'] != session
                     or current['expires_at'] <= timestamp):
                 return None
-            expired = connection.execute(
-                'SELECT r.operation_id FROM task_requests r JOIN operations o USING(operation_id) '
-                'WHERE o.base_id=? AND r.initiator_id=? AND r.workplace_id=? '
-                'AND r.delivery_state IN (\'claimed\',\'opening\',\'opened\') '
-                'AND r.lease_until<=?', (base, initiator, workplace, timestamp)).fetchall()
-            for item in expired:
-                connection.execute(
-                    'UPDATE task_requests SET delivery_state=\'unknown\',lease_owner=NULL,'
-                    'lease_until=NULL,updated_at=? WHERE operation_id=?',
-                    (timestamp, item['operation_id']))
+            self._recover_expired_claims(connection, base, initiator, workplace, timestamp)
             active = connection.execute(
                 'SELECT r.* FROM task_requests r JOIN operations o USING(operation_id) '
                 'WHERE o.base_id=? AND r.initiator_id=? AND r.workplace_id=? '
@@ -421,7 +454,8 @@ class OperationStore:
             if active is not None:
                 if (active['delivery_state'] == 'claimed'
                         and active['lease_owner'] == instance
-                        and active['lease_until'] > timestamp):
+                        and active['lease_until'] > timestamp
+                        and (operation is None or active['operation_id'] == operation)):
                     return self._task_request(active)
                 return None
             row = connection.execute(
@@ -430,7 +464,7 @@ class OperationStore:
                 'AND r.session_id=? AND r.delivery_state=\'queued\' '
                 'ORDER BY r.created_at,r.operation_id LIMIT 1',
                 (base, initiator, workplace, session)).fetchone()
-            if row is None:
+            if row is None or (operation is not None and row['operation_id'] != operation):
                 return None
             connection.execute(
                 'UPDATE task_requests SET delivery_state=\'claimed\',lease_owner=?,lease_until=?,'
@@ -450,6 +484,149 @@ class OperationStore:
             return self._enqueue_entity_message(connection, base=base, user=user,
                                                 operation=operation, message=message,
                                                 now=timestamp)
+
+    def confirm_task_opening(self, base, operation, instance, permission, *, now=None):
+        """Commit opening and its addressed confirmation together, after a live-session check."""
+        timestamp = self._timestamp(now)
+        with self._transaction() as connection:
+            request = connection.execute('SELECT r.*,o.base_id,o.order_id,o.task_id FROM task_requests r '
+                'JOIN operations o USING(operation_id) WHERE operation_id=?', (operation,)).fetchone()
+            if (request is None or request['base_id'] != base or request['task_id'] is not None
+                    or request['lease_owner'] != instance or request['lease_until'] is None
+                    or request['lease_until'] <= timestamp
+                    or request['delivery_state'] not in ('claimed','opening')
+                    or connection.execute('SELECT 1 FROM operation_conflicts WHERE operation_id=?',
+                                          (operation,)).fetchone() is not None):
+                raise Conflict('Opening is no longer authorized')
+            session = connection.execute('SELECT * FROM active_1c_sessions WHERE base_id=? '
+                'AND initiator_id=? AND workplace_id=?',
+                (base,request['initiator_id'],request['workplace_id'])).fetchone()
+            if (session is None or session['session_id'] != request['session_id']
+                    or session['expires_at'] <= timestamp):
+                raise Conflict('1C session is no longer active')
+            check = connection.execute('SELECT * FROM order_checks WHERE operation_id=?',
+                                       (operation,)).fetchone()
+            if (check is None or check['status'] != 'valid' or check['expires_at'] <= timestamp
+                    or check['session_id'] != request['session_id'] or check['instance_id'] != instance):
+                raise Conflict('Saved order has no fresh validation')
+            grants = connection.execute('SELECT message_json FROM entity_outbox WHERE operation_id=? '
+                'AND message_type=\'grant\'', (operation,)).fetchall()
+            grants = [json.loads(row['message_json']) for row in grants]
+            grant = next((row for row in grants if row.get('permissionId') == permission
+                          and row.get('instanceId') == instance
+                          and row.get('sessionId') == request['session_id']), None)
+            if grant is None or grant.get('expiresAt',0) <= timestamp:
+                raise Conflict('Opening permission is missing or expired')
+            confirmation = dict(grant, type='open',
+                messageId=self._entity_message_id('open',base,operation,permission),
+                expiresAt=min(grant['expiresAt'],session['expires_at'],check['expires_at']))
+            existing = connection.execute('SELECT message_json FROM entity_outbox WHERE message_id=?',
+                                          (confirmation['messageId'],)).fetchone()
+            if existing is not None:
+                confirmation = json.loads(existing['message_json'])
+                if confirmation['expiresAt'] <= timestamp:
+                    raise Conflict('Opening confirmation expired')
+            connection.execute('UPDATE task_requests SET delivery_state=\'opening\',updated_at=? '
+                               'WHERE operation_id=?', (timestamp,operation))
+            self._enqueue_entity_message(connection,base=base,user=request['initiator_id'],
+                operation=operation,message=confirmation,now=timestamp)
+            return confirmation
+
+    def require_order_check(self, base, operation, instance, *, now=None):
+        """Persist a challenge for 1C; heartbeat alone cannot authorize a saved order."""
+        timestamp = self._timestamp(now)
+        with self._transaction() as connection:
+            row = connection.execute('SELECT r.*,o.base_id FROM task_requests r '
+                'JOIN operations o USING(operation_id) WHERE operation_id=?',(operation,)).fetchone()
+            if (row is None or row['base_id'] != base or row['lease_owner'] != instance
+                    or row['delivery_state'] != 'claimed' or row['lease_until'] <= timestamp):
+                raise Conflict('Order check does not own a live claim')
+            check = connection.execute('SELECT * FROM order_checks WHERE operation_id=?',
+                                       (operation,)).fetchone()
+            replace = check is not None and (
+                (check['status'] == 'rejected' and check['validated_at'] + 10 <= timestamp)
+                or (check['status'] == 'valid' and check['expires_at'] <= timestamp))
+            if replace:
+                if connection.execute("SELECT 1 FROM entity_outbox WHERE operation_id=? AND message_type='open'",
+                                      (operation,)).fetchone() is not None:
+                    raise Conflict('A possible opening must be reconciled before reauthorization')
+                connection.execute('DELETE FROM order_checks WHERE operation_id=?',(operation,))
+                check = None
+            if check is None:
+                check_id = self._entity_message_id('check',base,operation,
+                    row['session_id']+'_'+instance+'_'+str(timestamp))
+                connection.execute('INSERT INTO order_checks(operation_id,check_id,session_id,instance_id,'
+                    'status,created_at) VALUES (?,?,?,?,\'pending\',?)',
+                    (operation,check_id,row['session_id'],instance,timestamp))
+                return None
+            if check['session_id'] != row['session_id'] or check['instance_id'] != instance:
+                raise Conflict('Order check belongs to another session or worker')
+            if check['status'] == 'pending':
+                return None
+            if check['status'] != 'valid' or check['expires_at'] <= timestamp:
+                raise Conflict('Saved order validation rejected or expired')
+            return {'payload':json.loads(check['payload_json']), 'expiresAt':check['expires_at'],
+                    'checkId':check['check_id']}
+
+    def order_check_id(self, base, operation, instance):
+        with self._transaction() as connection:
+            row = connection.execute('SELECT c.check_id FROM order_checks c '
+                'JOIN operations o USING(operation_id) WHERE o.base_id=? AND c.operation_id=? '
+                'AND c.instance_id=?',(base,operation,instance)).fetchone()
+            if row is None:
+                raise Conflict('Opening has no saved order check')
+            return row['check_id']
+
+    def pending_order_checks(self, base, initiator, workplace, session, *, now=None):
+        timestamp = self._timestamp(now)
+        with self._transaction() as connection:
+            rows = connection.execute('SELECT c.check_id,c.operation_id,o.order_id,c.created_at '
+                'FROM order_checks c JOIN task_requests r USING(operation_id) '
+                'JOIN operations o USING(operation_id) JOIN active_1c_sessions s '
+                'ON s.base_id=o.base_id AND s.initiator_id=r.initiator_id AND s.workplace_id=r.workplace_id '
+                'WHERE o.base_id=? AND r.initiator_id=? AND r.workplace_id=? AND r.session_id=? '
+                'AND s.session_id=? AND s.expires_at>? AND c.status=\'pending\' '
+                'AND c.session_id=r.session_id AND c.instance_id=r.lease_owner '
+                'AND r.delivery_state=\'claimed\' AND r.lease_until>? '
+                'ORDER BY c.created_at,c.operation_id',
+                (base,initiator,workplace,session,session,timestamp,timestamp)).fetchall()
+            return [{'checkId':row['check_id'],'operationId':row['operation_id'],
+                     'orderId':row['order_id'],'baseId':base,'sessionId':session} for row in rows]
+
+    def validate_order_check(self, base, order, operation, initiator, workplace, session,
+                             check_id, eligible, payload, *, now=None):
+        timestamp = self._timestamp(now)
+        if type(eligible) is not bool or not isinstance(payload, dict):
+            raise Conflict('Invalid saved-order validation')
+        try:
+            encoded = json.dumps(payload,ensure_ascii=False,sort_keys=True,allow_nan=False)
+            if len(encoded.encode('utf-8')) > self._MAX_REQUEST_BYTES:
+                raise ValueError
+        except (ValueError,TypeError,UnicodeError):
+            raise Conflict('Invalid saved-order snapshot') from None
+        with self._transaction() as connection:
+            row = connection.execute('SELECT r.*,o.base_id,o.order_id,o.task_id FROM task_requests r '
+                'JOIN operations o USING(operation_id) WHERE operation_id=?',(operation,)).fetchone()
+            check = connection.execute('SELECT * FROM order_checks WHERE operation_id=?',(operation,)).fetchone()
+            current = connection.execute('SELECT * FROM active_1c_sessions WHERE base_id=? '
+                'AND initiator_id=? AND workplace_id=?',(base,initiator,workplace)).fetchone()
+            if (row is None or check is None or row['base_id'] != base or row['order_id'] != order
+                    or row['initiator_id'] != initiator or row['workplace_id'] != workplace
+                    or row['session_id'] != session or check['session_id'] != session
+                    or check['check_id'] != check_id or check['instance_id'] != row['lease_owner']
+                    or row['task_id'] is not None or row['delivery_state'] != 'claimed'
+                    or row['lease_until'] <= timestamp or current is None
+                    or current['session_id'] != session or current['expires_at'] <= timestamp):
+                raise Conflict('Saved-order validation context is stale or mismatched')
+            status = 'valid' if eligible else 'rejected'
+            if check['status'] != 'pending':
+                if check['status'] != status or check['payload_json'] != encoded:
+                    raise Conflict('Saved-order validation already has a different result')
+                return {'status':status,'expiresAt':check['expires_at']}
+            expires_at = min(timestamp+30,row['lease_until'],current['expires_at'])
+            connection.execute('UPDATE order_checks SET status=?,payload_json=?,validated_at=?,expires_at=? '
+                'WHERE operation_id=?',(status,encoded,timestamp,expires_at,operation))
+            return {'status':status,'expiresAt':expires_at}
 
     def pending_entity_messages(self, *, user=None, limit=100):
         if user is not None:

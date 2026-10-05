@@ -55,6 +55,14 @@ class BitrixTaskReconciliationContract(unittest.TestCase):
                     self.assertEqual([], store.pending('base'))
                     self.assertEqual('pending', store.get('op-1')['state'])
 
+    def test_sparse_numeric_tag_map_from_portal_is_accepted(self):
+        self.task = {'id':'42','tags':{'17':'КА-op-1','29':'Other'}}
+        self.assertEqual(['КА-op-1','Other'],self.client._tags(self.client.read_task(42)))
+
+    def test_live_portal_tag_records_expose_exact_title(self):
+        self.task = {'id':'42','tags':{'4':{'id':4,'title':'КА-op-1'}}}
+        self.assertEqual(['КА-op-1'], self.client._tags(self.client.read_task(42)))
+
     def test_task_id_and_tag_shapes_are_strict(self):
         for task_id in (True, 0, -1, '42', 2**63):
             with self.subTest(task_id=task_id):
@@ -126,6 +134,17 @@ class BitrixTaskReconciliationContract(unittest.TestCase):
         self.assertEqual({'TAG':'КА-op-1'}, calls[0][1]['filter'])
         self.assertIn('TAGS', calls[0][1]['select'])
         self.assertTrue(calls[1][0].endswith('/tasks.task.get.json'))
+
+    def test_rest_top_level_next_is_followed(self):
+        starts=[]
+        def transport(url,body,timeout):
+            request=json.loads(body);starts.append(request['start'])
+            if request['start']==0:
+                return {'result':{'tasks':[{'id':'42','tags':['КА-op-1']}]},'next':50}
+            return {'result':{'tasks':[{'id':'43','tags':['КА-op-1']}]}}
+        client=BitrixRESTClient('https://portal.example.test','access-token-test',transport=transport)
+        self.assertEqual([42,43],client.find_task_ids_by_correlation_tag('КА-op-1'))
+        self.assertEqual([0,50],starts)
 
     def test_recovery_does_not_pick_between_duplicate_tag_matches(self):
         calls = []

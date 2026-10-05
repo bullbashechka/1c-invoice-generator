@@ -127,8 +127,15 @@ class TaskRequestQueueContract(unittest.TestCase):
             now=132, lease_seconds=30)['sessionId'])
         self.store.mark_task_request_opening('op-1','worker-1',now=133)
         self.store.heartbeat_1c_session(
-            'base-a', 'user-7', 'pc-11', 'session-restarted', now=140, ttl_seconds=30)
+            'base-a', 'user-7', 'pc-11', 'session-restarted', now=162, ttl_seconds=30)
         self.assertEqual('session-new', self.store.task_request('base-a','op-1')['sessionId'])
+
+    def test_live_workplace_session_cannot_be_replaced_by_second_client(self):
+        self.store.heartbeat_1c_session('base-a','user-7','pc-11','session-1',now=100)
+        with self.assertRaises(Conflict):
+            self.store.heartbeat_1c_session('base-a','user-7','pc-11','session-2',now=110)
+        self.store.heartbeat_1c_session('base-a','user-7','pc-11','session-1',now=111)
+        self.store.heartbeat_1c_session('base-a','user-7','pc-11','session-2',now=142)
 
     def test_request_outbox_is_persisted_and_rebound_with_the_1c_session(self):
         self.enqueue(session_id='session-old')
