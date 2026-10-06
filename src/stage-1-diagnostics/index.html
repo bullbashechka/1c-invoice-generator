@@ -4,7 +4,9 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>КА — проверка интерфейса Б24</title>
-    <script src="https://api.bitrix24.tech/api/v1/"></script>
+    <script id="bx24-sdk" src="https://api.bitrix24.tech/api/v1/" data-load-state="pending"
+        onload="this.setAttribute('data-load-state','loaded')"
+        onerror="this.setAttribute('data-load-state','failed')"></script>
     <script src="probe.js"></script>
     <script src="bind.js"></script>
     <script src="navigation.js"></script>
@@ -13,6 +15,7 @@
     <script src="oauth_export.js"></script>
     <script src="correlated_probe.js"></script>
     <script src="worker_probe.js"></script>
+    <script src="browser_probe.js"></script>
     <style>
         body { margin: 24px; font: 16px/1.5 system-ui, sans-serif; color: #202830; }
         h1 { font-size: 24px; }
@@ -23,6 +26,15 @@
     <h1>Проверка интерфейса Б24</h1>
     <p>Чтение прав, точек встраивания и команд текущей точки. Задачи не создаются и не изменяются.</p>
     <p id="status" role="status">Проверка…</p>
+    <section id="browser-probe" hidden>
+        <h2>Браузерная проба заполнения</h2>
+        <p>Откроет стандартную форму проекта «Гем платежи демо» через приложение Б24.
+            Проверьте название «Проверка контрагента &amp; филиал №1.» и служебный тег.
+            Закройте форму без сохранения. Описание, участников и срок эта проба не заполняет.</p>
+        <p>Проба не подключена к заказу 1С. Закрытие формы не подтверждает создание или отмену задачи.</p>
+        <button id="open-browser-probe" type="button" disabled>Проверить заполнение в браузере</button>
+        <pre id="browser-report"></pre>
+    </section>
     <details><summary>Отчёт REST и точек встраивания</summary><pre id="report"></pre></details>
     <h2>Проверка метки операции</h2>
     <pre id="environment-report"></pre>
@@ -48,29 +60,70 @@
         <h2>Диагностика карточки демопроекта</h2>
         <p>Подключает эту диагностику только к указанному демопроекту. Задачи не изменяет.</p>
         <label>ID демопроекта <input id="demo-group" inputmode="numeric" autocomplete="off"></label>
-        <button id="bind-demo" type="button">Подключить диагностику карточки</button>
+        <button id="bind-demo" type="button" disabled>Подключить диагностику карточки</button>
         <pre id="binding-report"></pre>
         <h2>Проба стандартной формы</h2>
         <p>Откроет новую стандартную задачу выбранного демопроекта с названием «Проверка контрагента.». Проверьте название и закройте форму без сохранения.</p>
-        <button id="open-task-probe" type="button">Открыть стандартную форму</button>
+        <button id="open-task-probe" type="button" disabled>Открыть стандартную форму</button>
         <pre id="navigation-report"></pre>
     </section>
     <script>
         (async () => {
             const status = document.getElementById("status");
             const output = document.getElementById("report");
+            const workerReport = document.getElementById("worker-report");
+            document.getElementById("read-worker").onclick = () => {
+                try { workerReport.textContent = localStorage.getItem("stage1.worker.environment") || "WORKER_NOT_OBSERVED"; }
+                catch { workerReport.textContent = "WORKER_STORAGE_UNAVAILABLE"; }
+            };
             if (window.self === window.top) {
                 status.textContent = "Откройте установленное приложение внутри десктопного Б24.";
                 return;
             }
             try {
                 const report = await runProbe(window.BX24);
+                const sdkState = document.getElementById("bx24-sdk")?.getAttribute?.("data-load-state");
+                report.build = "browser-sdk-guard-20261006";
+                report.sdk = { source: "https://api.bitrix24.tech/api/v1/",
+                    load: ["pending", "loaded", "failed"].includes(sdkState) ? sdkState : "unknown",
+                    hasInit: typeof window.BX24?.init === "function" };
                 status.textContent = report.status === "read_complete"
                     ? "Чтение выполнено. Открытие и предзаполнение формы задачи этим не подтверждены."
                     : "Чтение не завершено. Причина указана в отчёте.";
                 output.textContent = JSON.stringify(report, null, 2);
+                if (report.status !== "read_complete") {
+                    status.textContent = report.initialization?.error === "SDK_UNAVAILABLE"
+                        ? "Библиотека Б24 недоступна. Состояние её загрузки указано в отчёте."
+                        : "Чтение не завершено. Команды Б24 заблокированы; причина указана в отчёте.";
+                    document.getElementById("environment-report").textContent = JSON.stringify({
+                        status: "sdk_read_incomplete", placement: "UNKNOWN",
+                    }, null, 2);
+                    return;
+                }
                 const environment = diagnosticEnvironment(window);
                 document.getElementById("environment-report").textContent = JSON.stringify(environment, null, 2);
+                if (report.status === "read_complete" && report.context === "DEFAULT"
+                    && report.scopes.values.includes("task")) {
+                    const browserOutput = document.getElementById("browser-report");
+                    const browserButton = document.getElementById("open-browser-probe");
+                    let browserCallbackReceived = false;
+                    const browserProbe = createBrowserTaskProbe(window.BX24, {
+                        windowRef: window, operationId: "browser-" + randomId(window.crypto),
+                        onResult: result => {
+                            browserCallbackReceived = true;
+                            browserOutput.textContent = JSON.stringify(result, null, 2);
+                        },
+                    });
+                    document.getElementById("browser-probe").hidden = false;
+                    browserButton.disabled = false;
+                    browserButton.onclick = () => {
+                        browserButton.disabled = true;
+                        // Preserve a synchronous SDK callback instead of overwriting it with request_sent.
+                        browserCallbackReceived = false;
+                        const result = browserProbe.open();
+                        if (!browserCallbackReceived) browserOutput.textContent = JSON.stringify(result, null, 2);
+                    };
+                }
                 const operationInput = document.getElementById("probe-operation");
                 operationInput.value = randomId(window.crypto);
                 const correlation = document.getElementById("correlation-report");
@@ -78,7 +131,6 @@
                 const readCorrelated = document.getElementById("read-correlated");
                 openCorrelated.disabled = environment.status !== "desktop_detected";
                 readCorrelated.disabled = false;
-                const workerReport=document.getElementById("worker-report");
                 const bindWorker=document.getElementById("bind-worker");
                 bindWorker.disabled=environment.status!=="desktop_detected";
                 const readWorkplace=document.getElementById("read-workplace");
@@ -119,17 +171,19 @@
                         window.location.origin+window.location.pathname),null,2);}
                     catch(error) {workerReport.textContent=/^[A-Z_]{1,80}$/.test(error.message)?error.message:"WORKER_DIAGNOSTIC_FAILED";}
                 };
-                document.getElementById("read-worker").onclick=()=>{
-                    try {workerReport.textContent=localStorage.getItem("stage1.worker.environment")||"WORKER_NOT_OBSERVED";}
-                    catch {workerReport.textContent="WORKER_STORAGE_UNAVAILABLE";}
-                };
                 openCorrelated.onclick = () => {
+                    if (openCorrelated.disabled) return;
                     const operationId = operationInput.value.trim();
                     openCorrelated.disabled = true;
-                    correlation.textContent = JSON.stringify(openCorrelatedTaskProbe(window.BX24, {
+                    let callbackReceived = false;
+                    const started = openCorrelatedTaskProbe(window.BX24, {
                         windowRef:window, operationId,
-                        onResult:result => {correlation.textContent = JSON.stringify(result,null,2);},
-                    }),null,2);
+                        onResult:result => {
+                            callbackReceived = true;
+                            correlation.textContent = JSON.stringify(result,null,2);
+                        },
+                    });
+                    if (!callbackReceived) correlation.textContent = JSON.stringify(started,null,2);
                 };
                 readCorrelated.onclick = async () => {
                     const operationId = operationInput.value.trim();
@@ -143,6 +197,7 @@
                 if (report.status === "read_complete" && report.context === "DEFAULT"
                     && report.placements.values.includes("TASK_VIEW_TAB")) {
                     document.getElementById("demo-setup").hidden = false;
+                    document.getElementById("bind-demo").disabled = false;
                     document.getElementById("open-task-probe").disabled = environment.status !== "desktop_detected";
                     document.getElementById("open-task-probe").onclick = (event) => {
                         const output = document.getElementById("navigation-report");

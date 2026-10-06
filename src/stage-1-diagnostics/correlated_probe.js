@@ -8,11 +8,22 @@ function openCorrelatedTaskProbe(client, {windowRef, operationId, onResult}) {
     const environment = diagnosticEnvironment(windowRef);
     if (environment.status !== "desktop_detected") return environment;
     const buildPath = probeWorker ? probeWorker.buildTaskPath : taskPath;
-    const path = buildPath({operationId, payload:{TITLE:"КА демо — проверка метки.",
-        DESCRIPTION:"Диагностика сохранения служебной метки. Измените название и описание вручную.", GROUP_ID:"36"}});
+    let path;
+    try {
+        path = buildPath({operationId, payload:{TITLE:"КА демо — проверка метки.",
+            DESCRIPTION:"Диагностика сохранения служебной метки. Измените название и описание вручную.", GROUP_ID:"36"}});
+    } catch { return {status:"error", error:"INVALID_TASK_REQUEST"}; }
     if (typeof client?.openPath !== "function") return {status:"sdk_unavailable"};
-    client.openPath(path, () => onResult({status:"unknown", operationId}));
-    return {status:"request_sent", operationId, tag:`КА-${operationId}`};
+    try {
+        client.openPath(path, result => {
+            if (result?.result === "error") {
+                const code = ["PATH_NOT_AVAILABLE", "METHOD_NOT_SUPPORTED_ON_DEVICE"].includes(result.errorCode)
+                    ? result.errorCode : "UNKNOWN_RESPONSE";
+                onResult({status:"error", error:code, operationId});
+            } else onResult({status:"unknown", operationId});
+        });
+        return {status:"request_sent", operationId, tag:`КА-${operationId}`};
+    } catch { return {status:"error", error:"SDK_CALL_FAILED"}; }
 }
 async function readCorrelatedTask(client, operationId) {
     if (typeof operationId !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(operationId)) throw new Error("INVALID_OPERATION");
