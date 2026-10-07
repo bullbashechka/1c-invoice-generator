@@ -50,9 +50,18 @@ async function page({ missingSdk = false, native = false, init = "ready", sdkEve
     return { elements, calls, report: JSON.parse(elements.get("report").textContent) };
 }
 
+test("diagnostic page has no service access export and still opens the native card", async () => {
+    const { elements, report } = await page({ native: true,
+        openPath: (_, callback) => callback({ result: "close" }) });
+    assert.equal(report.status, "read_complete");
+    assert.equal(elements.has("export-oauth"), false);
+    elements.get("open-correlated").onclick();
+    assert.equal(JSON.parse(elements.get("correlation-report").textContent).status, "unknown");
+});
+
 function assertSdkCommandsBlocked(elements) {
     for (const id of ["open-browser-probe", "open-correlated", "read-correlated", "bind-worker",
-        "read-workplace", "export-oauth", "bind-demo", "open-task-probe"]) {
+        "read-workplace", "bind-demo", "open-task-probe"]) {
         assert.equal(elements.get(id).disabled, true, `${id} must remain disabled`);
         assert.equal(elements.get(id).onclick, undefined, `${id} must not attach an SDK command`);
     }

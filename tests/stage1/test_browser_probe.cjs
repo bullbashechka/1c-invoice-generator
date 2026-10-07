@@ -103,7 +103,8 @@ test("main browser app exposes manual probe while native actions remain blocked 
     const { elements, calls } = await appFixture(path => paths.push(path));
     assert.equal(elements.get("browser-probe").hidden, false);
     assert.equal(elements.get("open-browser-probe").disabled, false);
-    for (const id of ["open-correlated", "bind-worker", "read-workplace", "export-oauth"]) {
+    assert.equal(elements.has("export-oauth"), false);
+    for (const id of ["open-correlated", "bind-worker", "read-workplace"]) {
         assert.equal(elements.get(id).disabled, true);
     }
     assert.equal(paths.length, 0);

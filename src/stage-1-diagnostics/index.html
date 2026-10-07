@@ -12,7 +12,6 @@
     <script src="navigation.js"></script>
     <script src="background_worker.js"></script>
     <script src="worker-config.js"></script>
-    <script src="oauth_export.js"></script>
     <script src="correlated_probe.js"></script>
     <script src="worker_probe.js"></script>
     <script src="browser_probe.js"></script>
@@ -52,10 +51,6 @@
     <p>Профиль содержит ID сотрудника и этого рабочего места. Чтение профиля не включает обмен.</p>
     <button id="read-workplace" type="button" disabled>Прочитать профиль рабочего места</button>
     <pre id="workplace-report"></pre>
-    <h2>Настройка доступа службы</h2>
-    <p>Сохраните локальный файл доступа для настройки службы на этом компьютере. Файл содержит секретные ключи; не отправляйте его в чат и не включайте в исходники.</p>
-    <button id="export-oauth" type="button" disabled>Сохранить файл доступа службы</button>
-    <p id="oauth-status" role="status"></p>
     <section id="demo-setup" hidden>
         <h2>Диагностика карточки демопроекта</h2>
         <p>Подключает эту диагностику только к указанному демопроекту. Задачи не изменяет.</p>
@@ -143,27 +138,6 @@
                     catch(error) {profileOutput.textContent=/^[A-Z_]{1,80}$/.test(error.message)
                         ? error.message : "WORKPLACE_PROFILE_UNAVAILABLE";}
                     finally {readWorkplace.disabled=environment.status!=="desktop_detected";}
-                };
-                const exportOAuth=document.getElementById("export-oauth");
-                exportOAuth.disabled=environment.status!=="desktop_detected";
-                exportOAuth.onclick=async()=>{
-                    exportOAuth.disabled=true;
-                    const oauthStatus=document.getElementById("oauth-status");
-                    let downloadUrl;
-                    try {
-                        const bootstrap=await readOAuthBootstrap(window.STAGE1_WORKER_CONFIG,
-                            {windowRef:window,client:window.BX24});
-                        downloadUrl=URL.createObjectURL(new Blob([JSON.stringify(bootstrap)],
-                            {type:"application/json"}));
-                        const download=document.createElement("a");
-                        download.href=downloadUrl;download.download="ka-service-access.json";
-                        document.body.append(download);download.click();download.remove();
-                        oauthStatus.textContent="Загрузка файла доступа запрошена. Сохраните его локально для службы.";
-                    } catch {oauthStatus.textContent="Не удалось получить файл доступа. Обновите приложение и повторите.";}
-                    finally {
-                        if(downloadUrl)setTimeout(()=>URL.revokeObjectURL(downloadUrl),10000);
-                        exportOAuth.disabled=environment.status!=="desktop_detected";
-                    }
                 };
                 bindWorker.onclick=async()=>{
                     bindWorker.disabled=true;
