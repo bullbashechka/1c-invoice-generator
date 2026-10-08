@@ -80,6 +80,7 @@
 			<Enum>СтатусыДействияВидовЦен</Enum>
 			<InformationRegister>Расш1_СвязиЗаказовБ24</InformationRegister>
 			<CommonModule>Расш1_ОбменБ24Сервер</CommonModule>
+			<CommonModule>Расш1_RESTБ24Сервер</CommonModule>
 			<InformationRegister>Расш1_НастройкиОбменаБ24</InformationRegister>
 			<InformationRegister>Расш1_ОперацииБ24</InformationRegister>
 		</ChildObjects>
