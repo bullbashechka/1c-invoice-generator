@@ -1,0 +1,18 @@
+<?xml version='1.0' encoding='utf-8'?>
+<MetaDataObject xmlns="http://v8.1c.ru/8.3/MDClasses" version="2.16">
+  <CommonModule uuid="991c3f9e-540e-4d4f-b47e-878625fcc241">
+    <Properties>
+      <Name>Расш1_СервисRESTБ24</Name>
+      <Synonym />
+      <Comment />
+      <Global>false</Global>
+      <ClientManagedApplication>false</ClientManagedApplication>
+      <Server>true</Server>
+      <ExternalConnection>false</ExternalConnection>
+      <ClientOrdinaryApplication>false</ClientOrdinaryApplication>
+      <ServerCall>true</ServerCall>
+      <Privileged>false</Privileged>
+      <ReturnValuesReuse>DontUse</ReturnValuesReuse>
+    </Properties>
+  </CommonModule>
+</MetaDataObject>

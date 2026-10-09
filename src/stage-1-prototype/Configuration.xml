@@ -83,6 +83,12 @@
 			<CommonModule>Расш1_RESTБ24Сервер</CommonModule>
 			<InformationRegister>Расш1_НастройкиОбменаБ24</InformationRegister>
 			<InformationRegister>Расш1_ОперацииБ24</InformationRegister>
+			<InformationRegister>Расш1_ЖурналОперацийБ24</InformationRegister>
+			<InformationRegister>Расш1_СостояниеЗаказовБ24</InformationRegister>
+			<InformationRegister>Расш1_УведомленияБ24</InformationRegister>
+			<InformationRegister>Расш1_АудитСвязейБ24</InformationRegister>
+			<CommonModule>Расш1_ОперацииRESTБ24</CommonModule>
+			<CommonModule>Расш1_СервисRESTБ24</CommonModule>
 		</ChildObjects>
 	</Configuration>
 </MetaDataObject>

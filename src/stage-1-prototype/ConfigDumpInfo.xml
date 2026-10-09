@@ -8,6 +8,7 @@
 		<Metadata name="CommonPicture.Отчеты" id="38bc0a33-35fd-43af-b3b1-09957d8c32e1" configVersion="c72c4627d786e5f3abfb92e3bcf0d5e130e5f8e7"/>
 		<Metadata name="Configuration.Б24ПрототипЭтап1" id="827f97e0-90bc-4a06-9752-2d3712251f29" configVersion="f454b76ba829872b38babd2121100288f7665b5d"/>
 		<Metadata name="Document.ЗаказКлиента" id="6a7dec99-fbec-457b-ba99-764defab6b04" configVersion="5439df8ac930f3b61eaaa5f257fbb38e7cbd4276"/>
+		<Metadata name="Document.ЗаказКлиента.ObjectModule" id="6a7dec99-fbec-457b-ba99-764defab6b04.0"/>
 		<Metadata name="Document.ЗаказКлиента.Form.ФормаДокумента" id="7403c468-55a5-4381-ab35-0c74fe3113f3" configVersion="75bbc524d7c7675ed80eef268e9a47bfbcc37bec"/>
 		<Metadata name="Document.ЗаказКлиента.Form.ФормаДокумента.Form" id="7403c468-55a5-4381-ab35-0c74fe3113f3.0" configVersion="b09bfa8499168e889cddcb8ff677be43ba92f284"/>
 		<Metadata name="Document.ЗаказКлиента.Form.ФормаСписка" id="2ad4bb62-72c4-4ea4-9d0d-a9f199e87526" configVersion="9b4c0a2356ce62e4aac1b7080913795a21a936d2"/>
@@ -34,6 +35,9 @@
 			<Metadata name="Enum.ХозяйственныеОперации.EnumValue.ПередачаНаКомиссию" id="bd70b0bb-df33-434a-a7cf-6589f9a7a670"/>
 		</Metadata>
 		<Metadata name="InformationRegister.Расш1_СвязиЗаказовБ24" id="3f3cb572-a014-471c-a91a-25d84dbad2f2" configVersion="17eb0f40a6b752e8bb23b9c3a9a0c25725fec65f">
+			<Metadata name="InformationRegister.Расш1_СвязиЗаказовБ24.Resource.Портал" id="0b18186e-0825-4b49-9ca6-d1bfb61a3957"/>
+			<Metadata name="InformationRegister.Расш1_СвязиЗаказовБ24.Resource.Ссылка" id="6001f833-7871-4f9d-b182-d609b83a2e2d"/>
+			<Metadata name="InformationRegister.Расш1_СвязиЗаказовБ24.Resource.Название" id="abd80c64-2d02-473c-96fe-632c53df9104"/>
 			<Metadata name="InformationRegister.Расш1_СвязиЗаказовБ24.Dimension.Заказ" id="025a9e3c-5448-4930-9dd2-b86d5be583f9"/>
 			<Metadata name="InformationRegister.Расш1_СвязиЗаказовБ24.Resource.ОперацияId" id="11d365cf-e49c-432f-981a-b8b3d9bad0db"/>
 			<Metadata name="InformationRegister.Расш1_СвязиЗаказовБ24.Resource.ЗадачаId" id="961ceba5-65b5-4aa0-8d18-e528d18ff0a6"/>
@@ -43,5 +47,56 @@
 		<Metadata name="Role.Расш1_ОсновнаяРоль" id="2e291c44-afb2-4153-89d1-81e86f2ae59e" configVersion="bf5af5cedc4617778d8634cc0d0363c30a4fda7b"/>
 		<Metadata name="StyleItem.ИтогиФон" id="586a3dbe-2893-4a61-910e-a365b4dfc6f2" configVersion="7551c7c49ea7271d9702ab8ee51ad2271be02475"/>
 		<Metadata name="StyleItem.ЦветФонаВыделения" id="02076116-7625-4b3a-ac0b-59cddb3a742d" configVersion="16a060b10ab475264eece33fbb18198419362682"/>
+		<Metadata name="InformationRegister.Расш1_ЖурналОперацийБ24" id="37cfe106-182b-48c6-ae2f-0a89b326c73d">
+			<Metadata name="InformationRegister.Расш1_ЖурналОперацийБ24.Dimension.ОперацияId" id="e9eaf539-eccb-45d4-a654-9f1399159d54"/>
+			<Metadata name="InformationRegister.Расш1_ЖурналОперацийБ24.Resource.Заказ" id="f80a2995-1b96-423a-b509-ee9c1558a518"/>
+			<Metadata name="InformationRegister.Расш1_ЖурналОперацийБ24.Resource.БазаId" id="a4ac437a-462c-423f-9e42-735abb4ce968"/>
+			<Metadata name="InformationRegister.Расш1_ЖурналОперацийБ24.Resource.Портал" id="4d36c4b6-0a31-4eee-82ac-9adb68d76b9c"/>
+			<Metadata name="InformationRegister.Расш1_ЖурналОперацийБ24.Resource.ИнициаторId" id="58cbeb8e-2005-40cd-a371-124433e6ad8d"/>
+			<Metadata name="InformationRegister.Расш1_ЖурналОперацийБ24.Resource.СеансId" id="f174e973-e945-4b19-bf79-ab1665e85bb6"/>
+			<Metadata name="InformationRegister.Расш1_ЖурналОперацийБ24.Resource.НачалоUTC" id="fe484546-7de9-4883-a3a3-ec2e0010e071"/>
+			<Metadata name="InformationRegister.Расш1_ЖурналОперацийБ24.Resource.СледующаяПроверкаUTC" id="7d06c700-043d-4cc3-a95e-59ec3bf8080b"/>
+			<Metadata name="InformationRegister.Расш1_ЖурналОперацийБ24.Resource.СнимокJSON" id="e4242e1d-7834-40f3-b4f1-fc8cbb94cd0a"/>
+			<Metadata name="InformationRegister.Расш1_ЖурналОперацийБ24.Resource.Состояние" id="5e2010ea-bde7-4d1d-969f-a50e63cb0269"/>
+			<Metadata name="InformationRegister.Расш1_ЖурналОперацийБ24.Resource.ЗадачаId" id="0809e32d-b9f2-404f-81e7-8b76f1db93a1"/>
+			<Metadata name="InformationRegister.Расш1_ЖурналОперацийБ24.Resource.Название" id="7e224e97-91f1-45f3-84e7-ff02ec0efc19"/>
+			<Metadata name="InformationRegister.Расш1_ЖурналОперацийБ24.Resource.Ссылка" id="dac6fd46-2e69-4aa7-b17d-9beba360e638"/>
+			<Metadata name="InformationRegister.Расш1_ЖурналОперацийБ24.Resource.ВерсияСвязи" id="cbcfdfa2-1b09-4386-a5ac-564096d9a051"/>
+			<Metadata name="InformationRegister.Расш1_ЖурналОперацийБ24.Resource.ОтправкаНачата" id="cdca9185-f1ca-46f7-bddb-607d8d1ad2e2"/>
+		</Metadata>
+		<Metadata name="InformationRegister.Расш1_СостояниеЗаказовБ24" id="8da36c4e-0fa5-4842-952a-10973fa8fd04">
+			<Metadata name="InformationRegister.Расш1_СостояниеЗаказовБ24.Dimension.Заказ" id="8299a360-62ba-408e-9053-125c0e5272c0"/>
+			<Metadata name="InformationRegister.Расш1_СостояниеЗаказовБ24.Resource.ОперацияId" id="845ecdb2-15b8-4e35-bed3-3a5890734308"/>
+			<Metadata name="InformationRegister.Расш1_СостояниеЗаказовБ24.Resource.ВерсияСвязи" id="b7b99c1b-5e0b-403d-b8fb-c2bc1c167daf"/>
+			<Metadata name="InformationRegister.Расш1_СостояниеЗаказовБ24.Resource.ПоследняяУдаленнаяЗадача" id="be64d59a-af2d-4919-bdf9-8df957fb6061"/>
+		</Metadata>
+		<Metadata name="InformationRegister.Расш1_УведомленияБ24" id="9d06f02d-3a68-4549-be63-671aed96becb">
+			<Metadata name="InformationRegister.Расш1_УведомленияБ24.Dimension.СообщениеId" id="19788f09-3a6a-455c-9c20-bdda2801ffe7"/>
+			<Metadata name="InformationRegister.Расш1_УведомленияБ24.Resource.Заказ" id="105487f5-ad59-4809-8d40-742ad54b0b0a"/>
+			<Metadata name="InformationRegister.Расш1_УведомленияБ24.Resource.ИнициаторId" id="7121a828-c3df-4e04-ad87-0265a224c066"/>
+			<Metadata name="InformationRegister.Расш1_УведомленияБ24.Resource.ОперацияId" id="fd295381-a1e9-4680-8b99-b30bc3220601"/>
+			<Metadata name="InformationRegister.Расш1_УведомленияБ24.Resource.Текст" id="632c4ab9-c7a7-4199-81af-7a76140cafd3"/>
+			<Metadata name="InformationRegister.Расш1_УведомленияБ24.Resource.ВерсияСвязи" id="d1e322f0-638e-4e27-9117-52a302fa9639"/>
+			<Metadata name="InformationRegister.Расш1_УведомленияБ24.Resource.Доставлено" id="c5ac0e20-35e6-43f5-acaa-7218e17be1ce"/>
+		</Metadata>
+		<Metadata name="InformationRegister.Расш1_АудитСвязейБ24" id="7acdd3da-347c-4905-845b-4b38f374c41b">
+			<Metadata name="InformationRegister.Расш1_АудитСвязейБ24.Dimension.СобытиеId" id="c3f7cb5b-1c1d-43b2-9a24-d13b8438eeee"/>
+			<Metadata name="InformationRegister.Расш1_АудитСвязейБ24.Resource.Заказ" id="70750545-24e4-4800-be9d-e4f911d59935"/>
+			<Metadata name="InformationRegister.Расш1_АудитСвязейБ24.Resource.ИнициаторId" id="f3b12bbf-81a3-46bc-85ef-40683fe5f69e"/>
+			<Metadata name="InformationRegister.Расш1_АудитСвязейБ24.Resource.МоментUTC" id="4204fb68-c45e-4318-ba6e-edcf98b8a7be"/>
+			<Metadata name="InformationRegister.Расш1_АудитСвязейБ24.Resource.Действие" id="375cb376-98a6-4f24-99c8-08a8f7849da2"/>
+			<Metadata name="InformationRegister.Расш1_АудитСвязейБ24.Resource.ПрежняяЗадача" id="531a58d9-0877-4b56-9756-9155c8015cc0"/>
+			<Metadata name="InformationRegister.Расш1_АудитСвязейБ24.Resource.НоваяЗадача" id="5283ed6d-aaa5-4c9a-a28d-c4f17d63a970"/>
+			<Metadata name="InformationRegister.Расш1_АудитСвязейБ24.Resource.Портал" id="770dc92a-1ef9-4cd2-a1e1-0399dca9e81b"/>
+			<Metadata name="InformationRegister.Расш1_АудитСвязейБ24.Resource.ОперацияId" id="06d30c93-dd5f-4258-8a25-cb27a4e5adc6"/>
+		</Metadata>
+		<Metadata name="CommonModule.Расш1_ОперацииRESTБ24" id="9785b984-286a-4567-a2ec-f44033ebe455"/>
+		<Metadata name="CommonModule.Расш1_ОперацииRESTБ24.Module" id="9785b984-286a-4567-a2ec-f44033ebe455.0"/>
+		<Metadata name="CommonModule.Расш1_СервисRESTБ24" id="991c3f9e-540e-4d4f-b47e-878625fcc241"/>
+		<Metadata name="CommonModule.Расш1_СервисRESTБ24.Module" id="991c3f9e-540e-4d4f-b47e-878625fcc241.0"/>
+		<Metadata name="CommonModule.Расш1_RESTБ24Сервер" id="b3adbd8a-060b-4e91-ae96-53a5f0d8d8a3"/>
+		<Metadata name="CommonModule.Расш1_RESTБ24Сервер.Module" id="b3adbd8a-060b-4e91-ae96-53a5f0d8d8a3.0"/>
+		<Metadata name="CommonModule.Расш1_ОбменБ24Сервер" id="0c447dec-2037-45e7-8248-d82936c91b71"/>
+		<Metadata name="CommonModule.Расш1_ОбменБ24Сервер.Module" id="0c447dec-2037-45e7-8248-d82936c91b71.0"/>
 	</ConfigVersions>
 </ConfigDumpInfo>
