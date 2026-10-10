@@ -29,7 +29,9 @@ def main():
     parser.add_argument('--order', required=True, type=uuid.UUID)
     parser.add_argument('--posting-only', action='store_true', help='Keep REST disabled and verify native posting only')
     parser.add_argument('--allow-posted', action='store_true', help='Explicitly test an already posted own order without an existing attempt')
+    parser.add_argument('--close-form', action='store_true', help='Close only after a durable pending operation; fast completion is inconclusive')
     args = parser.parse_args()
+    assert not (args.close_form and args.posting_only), 'CLOSE_TEST_REQUIRES_CREATION'
     c = MCP(6004)
     profile = json.loads((ROOT / '.local/stage-1/one-c-profile.json').read_text(encoding='utf-8'))
     assert c.execute(PROBE)['baseFingerprint'] == profile['baseFingerprint'], 'DEMO_MISMATCH'
@@ -49,11 +51,13 @@ def main():
             print('AWAITING_TOOLKIT_CONFIRMATION_ENABLE', flush=True)
             c.execute(GATE.replace('__ENABLED__', 'true'))
         progress('native_command_requested')
-        code = (ROOT / 'tests/stage1/stage3_native_create_form_contract.bsl').read_text(encoding='utf-8').replace('__ORDER_UUID__', str(args.order))
+        contract = 'stage3_close_during_create.bsl' if args.close_form else 'stage3_native_create_form_contract.bsl'
+        code = (ROOT / 'tests/stage1' / contract).read_text(encoding='utf-8').replace('__ORDER_UUID__', str(args.order))
         response = c.rpc('tools/call', {'name':'execute_code', 'arguments':{'code':code,'execution_context':'client'}})
         (output / (stamp + '-client.json')).write_text(json.dumps(response, ensure_ascii=False, indent=2), encoding='utf-8')
         blocks = [json.loads(b['text']) for b in response.get('content',[]) if b.get('type') == 'text']
-        returned = len(blocks) == 1 and blocks[0].get('success') is True and blocks[0].get('data') == 'STAGE3_NATIVE_CREATE_COMMAND_RETURNED'
+        data = blocks[0].get('data') if len(blocks) == 1 and blocks[0].get('success') is True else None
+        returned = data.get('commandReturned') is True if args.close_form and isinstance(data, dict) else data == 'STAGE3_NATIVE_CREATE_COMMAND_RETURNED'
         state = c.execute(read)
         if returned and not args.posting_only:
             deadline = time.monotonic() + 45
@@ -64,6 +68,9 @@ def main():
         passed = returned and state['posted'] and (
             state['state'] == 'Нет' and not state['taskId'] and not state['operationId']
             if args.posting_only else state['state'] == 'Связана' and bool(state['taskId']))
+        if args.close_form:
+            passed = passed and isinstance(data, dict) and data.get('closedWhilePending') is True and data.get('operationId') == state['operationId']
+            print(json.dumps({'closeEvidence': data}, ensure_ascii=False), flush=True)
         print(json.dumps({'passed':passed,'postingOnly':args.posting_only,'commandReturned':returned,'posted':state['posted'],'state':state['state'],'taskId':state['taskId']}, ensure_ascii=False), flush=True)
         return 0 if passed else 1
     except UnknownOutcome:
