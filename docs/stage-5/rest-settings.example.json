@@ -1,0 +1,9 @@
+{
+  "portal": "https://toofirmagem.bitrix24.kz",
+  "groupId": 6,
+  "creatorId": 26,
+  "responsibleId": 12,
+  "accomplices": [10],
+  "auditors": [28, 30],
+  "maxTitleLength": 250
+}
