@@ -89,6 +89,7 @@
 			<InformationRegister>Расш1_АудитСвязейБ24</InformationRegister>
 			<CommonModule>Расш1_ОперацииRESTБ24</CommonModule>
 			<CommonModule>Расш1_СервисRESTБ24</CommonModule>
+			<CommonModule>Расш1_СпискиЗаказовБ24Сервер</CommonModule>
 		</ChildObjects>
 	</Configuration>
 </MetaDataObject>

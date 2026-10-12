@@ -6,13 +6,13 @@
 		<Metadata name="CommonPicture.Набор" id="04f2288f-eab7-4d2b-becc-6729479c9543" configVersion="bdef1812a5317eb3cd4ea94caf860cc6f66e7110"/>
 		<Metadata name="CommonPicture.Наборы" id="9a0e7e76-0073-43be-8d73-87876d10e539" configVersion="5e01006edb48d78941c08733442fbdc82531d86b"/>
 		<Metadata name="CommonPicture.Отчеты" id="38bc0a33-35fd-43af-b3b1-09957d8c32e1" configVersion="c72c4627d786e5f3abfb92e3bcf0d5e130e5f8e7"/>
-		<Metadata name="Configuration.Б24ПрототипЭтап1" id="827f97e0-90bc-4a06-9752-2d3712251f29" configVersion="f454b76ba829872b38babd2121100288f7665b5d"/>
-		<Metadata name="Document.ЗаказКлиента" id="6a7dec99-fbec-457b-ba99-764defab6b04" configVersion="5439df8ac930f3b61eaaa5f257fbb38e7cbd4276"/>
-		<Metadata name="Document.ЗаказКлиента.ObjectModule" id="6a7dec99-fbec-457b-ba99-764defab6b04.0"/>
+		<Metadata name="Configuration.Б24ПрототипЭтап1" id="827f97e0-90bc-4a06-9752-2d3712251f29" configVersion="f555df49cfc09607f3a7095e5a794561316bc312"/>
+		<Metadata name="Document.ЗаказКлиента" id="6a7dec99-fbec-457b-ba99-764defab6b04" configVersion="0e1251f6401eab48a4f251360ada7cb7459b8dc9"/>
+		<Metadata name="Document.ЗаказКлиента.ObjectModule" id="6a7dec99-fbec-457b-ba99-764defab6b04.0" configVersion="442153b910b14bf10b2b3e63e08a70b637cb7208"/>
 		<Metadata name="Document.ЗаказКлиента.Form.ФормаДокумента" id="7403c468-55a5-4381-ab35-0c74fe3113f3" configVersion="75bbc524d7c7675ed80eef268e9a47bfbcc37bec"/>
-		<Metadata name="Document.ЗаказКлиента.Form.ФормаДокумента.Form" id="7403c468-55a5-4381-ab35-0c74fe3113f3.0" configVersion="b09bfa8499168e889cddcb8ff677be43ba92f284"/>
+		<Metadata name="Document.ЗаказКлиента.Form.ФормаДокумента.Form" id="7403c468-55a5-4381-ab35-0c74fe3113f3.0" configVersion="ffcf41f857522d6a27a4367174375e4fd2c8ed97"/>
 		<Metadata name="Document.ЗаказКлиента.Form.ФормаСписка" id="2ad4bb62-72c4-4ea4-9d0d-a9f199e87526" configVersion="9b4c0a2356ce62e4aac1b7080913795a21a936d2"/>
-		<Metadata name="Document.ЗаказКлиента.Form.ФормаСписка.Form" id="2ad4bb62-72c4-4ea4-9d0d-a9f199e87526.0" configVersion="246c898fa9654415a7da7a807c2da3fdac357c5d"/>
+		<Metadata name="Document.ЗаказКлиента.Form.ФормаСписка.Form" id="2ad4bb62-72c4-4ea4-9d0d-a9f199e87526.0" configVersion="0fdfb7eec905dc92d54a28f8220ad7ee3fb251b9"/>
 		<Metadata name="Enum.СпособыДоставки" id="4c005a39-57c8-441c-ad14-96c4b60c2114" configVersion="9052a62c66ede5fb444c8e432978c19a39a8eecc">
 			<Metadata name="Enum.СпособыДоставки.EnumValue.СиламиПеревозчика" id="25e6d9cf-abe9-4444-a68e-a297cfe064b2"/>
 			<Metadata name="Enum.СпособыДоставки.EnumValue.КПолучателюОпределяетСлужбаДоставки" id="326b1fbb-045c-4c0e-9aef-7e7b808f03f1"/>
@@ -42,7 +42,7 @@
 			<Metadata name="InformationRegister.Расш1_СвязиЗаказовБ24.Resource.ОперацияId" id="11d365cf-e49c-432f-981a-b8b3d9bad0db"/>
 			<Metadata name="InformationRegister.Расш1_СвязиЗаказовБ24.Resource.ЗадачаId" id="961ceba5-65b5-4aa0-8d18-e528d18ff0a6"/>
 		</Metadata>
-		<Metadata name="InformationRegister.Расш1_СвязиЗаказовБ24.RecordSetModule" id="3f3cb572-a014-471c-a91a-25d84dbad2f2.1" configVersion="358e2503efefb93d54186e16d12b79e4c6dcf66b"/>
+		<Metadata name="InformationRegister.Расш1_СвязиЗаказовБ24.RecordSetModule" id="3f3cb572-a014-471c-a91a-25d84dbad2f2.1" configVersion="513a690d8d52b81261e6adcbbf27ae5dd03e2d11"/>
 		<Metadata name="Language.Русский" id="ac19c678-c0fa-4814-837e-d9ce207ea1a7" configVersion="412802e37a7d1bf4f54b6b874b22007c0f3bcbb9"/>
 		<Metadata name="Role.Расш1_ОсновнаяРоль" id="2e291c44-afb2-4153-89d1-81e86f2ae59e" configVersion="bf5af5cedc4617778d8634cc0d0363c30a4fda7b"/>
 		<Metadata name="StyleItem.ИтогиФон" id="586a3dbe-2893-4a61-910e-a365b4dfc6f2" configVersion="7551c7c49ea7271d9702ab8ee51ad2271be02475"/>
@@ -90,13 +90,17 @@
 			<Metadata name="InformationRegister.Расш1_АудитСвязейБ24.Resource.Портал" id="770dc92a-1ef9-4cd2-a1e1-0399dca9e81b"/>
 			<Metadata name="InformationRegister.Расш1_АудитСвязейБ24.Resource.ОперацияId" id="06d30c93-dd5f-4258-8a25-cb27a4e5adc6"/>
 		</Metadata>
-		<Metadata name="CommonModule.Расш1_ОперацииRESTБ24" id="9785b984-286a-4567-a2ec-f44033ebe455"/>
-		<Metadata name="CommonModule.Расш1_ОперацииRESTБ24.Module" id="9785b984-286a-4567-a2ec-f44033ebe455.0"/>
-		<Metadata name="CommonModule.Расш1_СервисRESTБ24" id="991c3f9e-540e-4d4f-b47e-878625fcc241"/>
-		<Metadata name="CommonModule.Расш1_СервисRESTБ24.Module" id="991c3f9e-540e-4d4f-b47e-878625fcc241.0"/>
-		<Metadata name="CommonModule.Расш1_RESTБ24Сервер" id="b3adbd8a-060b-4e91-ae96-53a5f0d8d8a3"/>
-		<Metadata name="CommonModule.Расш1_RESTБ24Сервер.Module" id="b3adbd8a-060b-4e91-ae96-53a5f0d8d8a3.0"/>
-		<Metadata name="CommonModule.Расш1_ОбменБ24Сервер" id="0c447dec-2037-45e7-8248-d82936c91b71"/>
-		<Metadata name="CommonModule.Расш1_ОбменБ24Сервер.Module" id="0c447dec-2037-45e7-8248-d82936c91b71.0"/>
+		<Metadata name="CommonModule.Расш1_ОперацииRESTБ24" id="9785b984-286a-4567-a2ec-f44033ebe455" configVersion="423902dc13d2a6af11aead11bc3cd13399c459c2"/>
+		<Metadata name="CommonModule.Расш1_ОперацииRESTБ24.Module" id="9785b984-286a-4567-a2ec-f44033ebe455.0" configVersion="538cb5e8ba6f1b2eb288095ed5da0c000717df9e"/>
+		<Metadata name="CommonModule.Расш1_СервисRESTБ24" id="991c3f9e-540e-4d4f-b47e-878625fcc241" configVersion="35f95ddbff176421a8774ed262f398a85ce6b1b6"/>
+		<Metadata name="CommonModule.Расш1_СервисRESTБ24.Module" id="991c3f9e-540e-4d4f-b47e-878625fcc241.0" configVersion="9d105df47edad7b67823c6a7238ea940e5c828cf"/>
+		<Metadata name="CommonModule.Расш1_RESTБ24Сервер" id="b3adbd8a-060b-4e91-ae96-53a5f0d8d8a3" configVersion="90253291f31a93e13072a00b0841afed96816c1e"/>
+		<Metadata name="CommonModule.Расш1_RESTБ24Сервер.Module" id="b3adbd8a-060b-4e91-ae96-53a5f0d8d8a3.0" configVersion="57a1d144979b17f460025f9e412833844d793091"/>
+		<Metadata name="CommonModule.Расш1_ОбменБ24Сервер" id="0c447dec-2037-45e7-8248-d82936c91b71" configVersion="78996d86a82fc85e477277702ac45f12c33454a0"/>
+		<Metadata name="CommonModule.Расш1_ОбменБ24Сервер.Module" id="0c447dec-2037-45e7-8248-d82936c91b71.0" configVersion="8ab83382374ce4f53863c9ca5b1ae92fe7e8b8d9"/>
+		<Metadata name="Document.ЗаказКлиента.Form.ФормаСпискаДокументов" id="d6e6858c-2d93-4bb0-9fed-a2f58b14bfd4" configVersion="e6817bebd23858e6c23babe1ca66a6c79b693a2e"/>
+		<Metadata name="Document.ЗаказКлиента.Form.ФормаСпискаДокументов.Form" id="d6e6858c-2d93-4bb0-9fed-a2f58b14bfd4.0" configVersion="41bd0b623959aa5a3962056982d1e9c9560a2e43"/>
+		<Metadata name="CommonModule.Расш1_СпискиЗаказовБ24Сервер" id="754b1c75-244b-4eef-9074-6207c6a520cb" configVersion="fb60593eb077400c17e21d5358c130cebc844aaf"/>
+		<Metadata name="CommonModule.Расш1_СпискиЗаказовБ24Сервер.Module" id="754b1c75-244b-4eef-9074-6207c6a520cb.0" configVersion="538d15be7be7e182f89c4ae2a5c8a61aa86feb33"/>
 	</ConfigVersions>
 </ConfigDumpInfo>
