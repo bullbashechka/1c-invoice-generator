@@ -22,6 +22,11 @@ PROBE = '''ХешБазы = Новый ХешированиеДанных(Хеш
     НомерСоединенияИнформационнойБазы(), НомерСеансаИнформационнойБазы(),
     Метаданные.Имя, Метаданные.Версия, Строка(ХешБазы.ХешСумма), Выборка.Количество);'''
 
+LINKS_PROBE = '''Запрос = Новый Запрос("ВЫБРАТЬ Заказ, ЗадачаId, ОперацияId, Портал, Название, Ссылка ИЗ РегистрСведений.Расш1_СвязиЗаказовБ24 УПОРЯДОЧИТЬ ПО Заказ");
+Хеш = Новый ХешированиеДанных(ХешФункция.SHA256);
+Хеш.Добавить(ЗначениеВСтрокуВнутр(Запрос.Выполнить().Выгрузить()));
+Результат = Строка(Хеш.ХешСумма);'''
+
 
 def decode(raw: str) -> dict:
     if not raw.lstrip().startswith('{'):
@@ -105,8 +110,8 @@ def run(port_a: int, port_b: int, output: Path, expected_fingerprint: str,
     clients = [MCP(port_a), MCP(port_b)]
     probes = [client.execute(PROBE) for client in clients]
     if any(p['configuration'] != 'КомплекснаяАвтоматизацияДляКазахстана'
-           or p['version'] != '2.4.5.18' or p['rows'] != 0 for p in probes):
-        raise RuntimeError('DEMO_CONFIGURATION_AND_EMPTY_REGISTER_REQUIRED')
+           or p['version'] != '2.4.5.18' for p in probes):
+        raise RuntimeError('DEMO_CONFIGURATION_REQUIRED')
     if probes[0]['baseFingerprint'] != probes[1]['baseFingerprint']:
         raise RuntimeError('SAME_DATABASE_REQUIRED')
     if probes[0]['baseFingerprint'] != expected_fingerprint:
@@ -114,6 +119,9 @@ def run(port_a: int, port_b: int, output: Path, expected_fingerprint: str,
     if (probes[0]['sessionId'] == probes[1]['sessionId']
             or probes[0]['connectionId'] == probes[1]['connectionId']):
         raise RuntimeError('TWO_DISTINCT_ONEC_SESSIONS_REQUIRED')
+    baseline_hash = clients[0].execute(LINKS_PROBE)
+    if clients[1].execute(LINKS_PROBE) != baseline_hash:
+        raise RuntimeError('BASELINE_CHANGED_BEFORE_TEST')
 
     run_id = uuid.uuid4().hex
     orders = attempts['orderIds']
@@ -147,13 +155,27 @@ def run(port_a: int, port_b: int, output: Path, expected_fingerprint: str,
 
     server = ThreadingHTTPServer(('127.0.0.1', 0), Barrier)
     server_thread = threading.Thread(target=server.serve_forever, daemon=True)
-    server_thread.start()
     prelude = f'''Заказ1 = Документы.ЗаказКлиента.ПолучитьСсылку(Новый УникальныйИдентификатор("{orders[0]}"));
 Заказ2 = Документы.ЗаказКлиента.ПолучитьСсылку(Новый УникальныйИдентификатор("{orders[1]}"));
 ЗадачаIdТеста = "{task_ids[0]}"; ЗадачаIdВторой = "{task_ids[1]}";
 Операция1 = "{operations[0]}"; Операция2 = "{operations[1]}";
 ПортБарьера = {server.server_port}; ПутьБарьера = "/{run_id}";
+ОбщаяЗадачаРазрешена = {'Истина' if conflict == 'task' else 'Ложь'};
 '''
+    collision_check = '''Запрос = Новый Запрос("ВЫБРАТЬ Заказ ИЗ РегистрСведений.Расш1_СвязиЗаказовБ24
+        |ГДЕ Заказ = &Заказ1 ИЛИ Заказ = &Заказ2 ИЛИ ЗадачаId = &Задача1 ИЛИ ЗадачаId = &Задача2
+        |ИЛИ ОперацияId = &Операция1 ИЛИ ОперацияId = &Операция2");
+Запрос.УстановитьПараметр("Заказ1", Заказ1); Запрос.УстановитьПараметр("Заказ2", Заказ2);
+Запрос.УстановитьПараметр("Задача1", ЗадачаIdТеста); Запрос.УстановитьПараметр("Задача2", ЗадачаIdВторой);
+Запрос.УстановитьПараметр("Операция1", Операция1); Запрос.УстановитьПараметр("Операция2", Операция2);
+Результат = Запрос.Выполнить().Пустой();'''
+    try:
+        if not clients[0].execute(prelude + collision_check):
+            raise RuntimeError('TEST_KEYS_ALREADY_USED')
+    except Exception:
+        server.server_close()
+        raise
+    server_thread.start()
     report = {'runId': run_id, 'conflict': conflict, 'orderIds': orders,
               'operationIds': operations, 'syntheticTaskId': task_ids[0],
               'syntheticTaskIds': task_ids, 'sessions': probes, 'status': 'started'}
@@ -184,8 +206,9 @@ def run(port_a: int, port_b: int, output: Path, expected_fingerprint: str,
                     timeline['release'] = time.monotonic()
                 release.set()
                 holder_result, contender_result = holder.result(), contender.result()
+                contender_status = 'contender_committed' if conflict == 'task' else 'contender_conflict'
                 if (holder_result != {'status': 'holder_committed', 'sessionId': probes[0]['sessionId']}
-                        or contender_result != {'status': 'contender_conflict', 'sessionId': probes[1]['sessionId']}):
+                        or contender_result != {'status': contender_status, 'sessionId': probes[1]['sessionId']}):
                     raise RuntimeError('UNEXPECTED_ACTOR_RESULT')
                 report['actors'] = [holder_result, contender_result]
             except Exception as error:
@@ -204,6 +227,8 @@ def run(port_a: int, port_b: int, output: Path, expected_fingerprint: str,
             raise RuntimeError(scenario_error)
         if cleanup != {'firstLinkPreserved': True, 'testRowsRemaining': 0}:
             raise RuntimeError('FIRST_LINK_NOT_PRESERVED')
+        if clients[0].execute(LINKS_PROBE) != baseline_hash:
+            raise RuntimeError('EXISTING_LINKS_CHANGED')
         report['status'] = 'STAGE1_REGISTER_CONCURRENCY_GREEN'
     except Exception as error:
         report['status'] = 'not_passed'
@@ -224,7 +249,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--ports', nargs=2, type=int, default=[6003, 6004])
     parser.add_argument('--conflict', choices=['task', 'order', 'operation'], default='task',
-                        help='The one key shared by the two competing attempts')
+                        help='Shared task ID must succeed; shared order or operation must conflict')
     parser.add_argument('--output', type=Path, default=Path('.local/stage-1/register-concurrency-private.json'))
     parser.add_argument('--demo-proof', type=Path, required=True,
                         help='Private read-only execute_code result with baseFingerprint for the authorized demo')

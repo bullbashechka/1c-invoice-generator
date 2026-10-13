@@ -1,0 +1,2 @@
+# Штатная выгрузка программиста использует CRLF; проверять пробелы, сохраняя этот формат.
+src/stage-1-programmer-20261013/** whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
